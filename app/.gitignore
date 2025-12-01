@@ -69,4 +69,4 @@ SECURITY EXCLUSIONS
 
 -----------------------
 
-firebase_options.dart
+firebase_options.dart**/secrets.h
