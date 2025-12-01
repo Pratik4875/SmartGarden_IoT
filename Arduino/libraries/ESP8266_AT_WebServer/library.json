@@ -1,0 +1,39 @@
+{
+  "name": "ESP8266_AT_WebServer",
+  "version": "1.7.1",
+  "keywords": "wifi, WebServer, server, AT-command, wifi-shield, ESP8266, ESP32, Teensy, AVR, SAM-DUE, SAMD, Maixduino, STM32, nRF52, ESP8266-AT, ESP32-AT, rpi-pico, rp2040, wizfi360, mbed, Maixduino-AI",
+  "description": "Simple WebServer library for AVR, Teensy, SAM DUE, SAMD21, SAMD51, STM32F/L/H/G/WB/MP1, nRF52, SIPEED_MAIX_DUINO and RP2040-based (RASPBERRY_PI_PICO) boards using ESP8266/ESP32 AT-command shields with functions similar to those of ESP8266/ESP32 WebServer libraries. The library supports HTTP GET and POST requests, provides argument parsing, handles one client at a time. Now support CORS and with fix of severe limitation to permit sending much larger data than total 2K buffer",
+  "authors":
+  {
+    "name":  "Khoi Hoang",
+    "url":   "https://github.com/khoih-prog",
+    "maintainer": true
+  },    
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com/khoih-prog/ESP8266_AT_WebServer"
+  },
+  "homepage": "https://github.com/khoih-prog/ESP8266_AT_WebServer",
+  "export": {
+    "exclude": [
+      "linux",
+      "extras",
+      "tests"
+    ]
+  },
+  "dependencies": 
+  [
+    {
+      "owner": "khoih-prog",
+      "name": "Functional-Vlpp",
+      "version": "^1.0.2",
+      "platforms": ["*"]
+    }
+  ],
+  "license": "MIT",
+  "frameworks": "*",
+  "platforms": "*",
+  "examples": "examples/*/*/*.ino",
+  "headers": ["ESP8266_AT_WebServer.h", "ESP8266_AT_Server.h", "ESP8266_AT_Client.h", "ESP8266_AT_Udp.h"]
+}
