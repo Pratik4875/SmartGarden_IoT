@@ -1,5 +1,42 @@
-.dart_tool/
-build/
-.pio/
+-----------------------
+
+SYSTEM & IDE FILES
+
+-----------------------
+
+.DS_Store
 .vscode/
-*.env
+.idea/
+*.swp
+
+-----------------------
+
+SECURITY EXCLUSIONS (CRITICAL)
+
+-----------------------
+
+Ignore ANY file named secrets.h in any folder
+
+**/secrets.h
+
+Ignore Firebase options in the app folder (contains API keys)
+
+**/firebase_options.dart
+
+Ignore Private Keys for Android/iOS (if you add them later)
+
+**/.jks
+**/.keystore
+**/key.properties
+**/GoogleService-Info.plist
+**/google-services.json
+
+-----------------------
+
+BUILD ARTIFACTS
+
+-----------------------
+
+Ignore PlatformIO builds (Arduino)
+
+.pio/

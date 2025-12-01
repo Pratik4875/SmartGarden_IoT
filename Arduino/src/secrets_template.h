@@ -1,0 +1,15 @@
+/*
+  RENAME THIS FILE TO "secrets.h" AND FILL IN YOUR CREDENTIALS
+*/
+
+#ifndef SECRETS_H
+#define SECRETS_H
+
+#define WIFI_SSID "YOUR_WIFI_NAME"
+#define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+
+#define API_KEY "YOUR_FIREBASE_API_KEY"
+#define DB_URL "YOUR_FIREBASE_DB_URL"
+#define DEVICE_ID "device_01"
+
+#endif
