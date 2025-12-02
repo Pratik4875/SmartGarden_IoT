@@ -1,4 +1,4 @@
-name: app
+name: ecosync
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -41,6 +41,9 @@ dependencies:
   google_fonts: ^6.3.2
   flutter_svg: ^2.2.3
   ota_update: ^7.0.2
+  shared_preferences: ^2.5.3 
+  fl_chart: ^1.1.1
+  firebase_auth: ^6.1.2
 
 dev_dependencies:
   flutter_test:

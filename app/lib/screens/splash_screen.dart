@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dashboard.dart';
+import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -24,12 +26,30 @@ class _SplashScreenState extends State<SplashScreen>
     _opacity = Tween<double>(begin: 0.0, end: 1.0).animate(_controller);
 
     _controller.forward().then((value) {
-      Future.delayed(const Duration(milliseconds: 500), () {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => DashboardScreen()),
-        );
-      });
+      _navigateNext();
     });
+  }
+
+  Future<void> _navigateNext() async {
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    final prefs = await SharedPreferences.getInstance();
+    final url = prefs.getString('firebase_url');
+
+    if (mounted) {
+      if (url != null && url.isNotEmpty) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => DashboardScreen(databaseUrl: url),
+          ),
+        );
+      } else {
+        // Fallback if somehow we got here without a URL
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
+      }
+    }
   }
 
   @override
@@ -40,6 +60,9 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    // ... (Keep your existing UI code for the Logo/Text) ...
+    // ... just changing the class logic above ...
+    // Paste the UI from previous step here
     return Scaffold(
       backgroundColor: const Color(0xFF1E1E1E), // Dark Theme Background
       body: Center(
@@ -48,7 +71,6 @@ class _SplashScreenState extends State<SplashScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Logo (Uses Icon if image missing, or you can uncomment Image.asset)
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -57,14 +79,14 @@ class _SplashScreenState extends State<SplashScreen>
                   border: Border.all(color: Colors.greenAccent, width: 2),
                 ),
                 child: const Icon(
-                  Icons.eco, // Leaf Icon
+                  Icons.eco,
                   size: 80,
                   color: Colors.greenAccent,
                 ),
               ),
               const SizedBox(height: 30),
               Text(
-                'SMART GARDEN',
+                'ECOSYNC', // UPDATED NAME
                 style: GoogleFonts.poppins(
                   color: Colors.white,
                   fontSize: 28,
@@ -73,7 +95,7 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
               ),
               Text(
-                'IoT Automation',
+                'Smart Home Automation',
                 style: GoogleFonts.poppins(
                   color: Colors.grey,
                   fontSize: 14,

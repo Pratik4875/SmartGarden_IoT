@@ -1,9 +1,10 @@
 /* ===========================================================
-   SMART GARDEN - FIRMWARE V1.7 (SPEED & LIMIT)
+   SMART GARDEN - FIRMWARE V2.3 (SECURE + LOGGER)
    
    Updates:
-   1. SPEED: Polls Firebase every 200ms (5x faster).
-   2. SAFETY: Hard Limit set to 2 SECONDS (Testing Mode).
+   1. SECURE: Uses ?auth=DB_SECRET to bypass locked rules.
+   2. LOGGING: Pushes data to '/history' every 60 minutes.
+   3. UNIFIED: Keeps all v2.1 logic (Sync, Manual, Auto).
    ===========================================================
 */
 
@@ -24,11 +25,10 @@
 #define SOIL_POWER   D6
 #define SOIL_PIN     A0
 
-// ---------------- TIMING ADJUSTMENTS ----------------
-#define POLL_INTERVAL_MS 200     // <--- ULTRA FAST RESPONSE (0.2s)
+// ---------------- TIMING ----------------
+#define POLL_INTERVAL_MS 200     
 #define SENSOR_INTERVAL_MS 10000 
-#define HARD_LIMIT_SEC 2         // <--- 2 SECONDS LIMIT (As requested)
-#define AUTO_DURATION_SEC 3000      // Auto schedule also runs for 2s
+#define HISTORY_INTERVAL_MS 3600000 // 1 Hour (60 * 60 * 1000)
 
 // ---------------- OBJECTS ----------------
 DHT dht(DHT_PIN, DHT_TYPE);
@@ -40,29 +40,43 @@ HTTPClient http;
 // ---------------- VARIABLES ----------------
 unsigned long lastPoll = 0;
 unsigned long lastSensor = 0;
+unsigned long lastHistoryLog = 0; // History Timer
 unsigned long lastDebugPrint = 0;
 unsigned long pumpStartTime = 0;
 bool isPumpRunning = false;
 int lastScheduledMinute = -1;
 
-// ---------------- HELPERS ----------------
+unsigned long currentDurationLimit = 5000;
+
+// ---------------- HELPERS (SECURE) ----------------
 void setupWifi() {
   WiFi.mode(WIFI_STA);
-  WiFi.setSleepMode(WIFI_NONE_SLEEP);
+  WiFi.setSleepMode(WIFI_NONE_SLEEP); // Keep Power Bank Alive
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) { delay(500); }
+  while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
+  Serial.println("\nWiFi Connected");
   client.setInsecure(); 
 }
 
+// Write (Overwrite) - uses DB_SECRET
 void dbWrite(String path, String value) {
-  String url = String(DB_URL) + path + ".json?auth=" + API_KEY;
+  String url = String(DB_URL) + path + ".json?auth=" + DB_SECRET;
   http.begin(client, url);
   http.PUT(value);
   http.end();
 }
 
+// Push (Add to list) - uses DB_SECRET
+void dbPush(String path, String value) {
+  String url = String(DB_URL) + path + ".json?auth=" + DB_SECRET;
+  http.begin(client, url);
+  http.POST(value); // POST creates a unique ID (history log)
+  http.end();
+}
+
+// Read - uses DB_SECRET
 String dbRead(String path) {
-  String url = String(DB_URL) + path + ".json?auth=" + API_KEY;
+  String url = String(DB_URL) + path + ".json?auth=" + DB_SECRET;
   http.begin(client, url);
   int code = http.GET();
   if(code == 200) return http.getString();
@@ -71,21 +85,38 @@ String dbRead(String path) {
 
 // ---------------- LOGIC ----------------
 
-void pumpON(String source) {
-  if(isPumpRunning) return;
+int getDuration() {
+  String durStr = dbRead("/config/scheduler/duration_sec");
+  int val = (durStr != "null") ? durStr.toInt() : 5;
+  if (val <= 0) val = 5; 
+  return val;
+}
+
+void startPumpLogic(String source) {
+  if (isPumpRunning) return;
+
+  int duration = getDuration();
+  currentDurationLimit = duration * 1000UL;
+
+  Serial.printf(">>> STARTING PUMP [%s] for %d seconds\n", source.c_str(), duration);
   pinMode(RELAY_PIN, OUTPUT);
   digitalWrite(RELAY_PIN, LOW); // ON
   isPumpRunning = true;
-  pumpStartTime = millis(); 
-  Serial.println(">>> PUMP ON [" + source + "]");
+  pumpStartTime = millis();
+  
   dbWrite("/status/pump_active", "true");
+  
+  // Sync the switch to TRUE so the loop doesn't kill it
+  if (source == "AUTO_SCHEDULE") dbWrite("/control/pump", "true");
 }
 
-void pumpOFF(String reason) {
-  if(!isPumpRunning && reason != "BOOT") return;
+void stopPumpLogic(String reason) {
+  if (!isPumpRunning && reason != "BOOT") return;
+
+  Serial.printf(">>> STOPPING PUMP [%s]\n", reason.c_str());
   pinMode(RELAY_PIN, INPUT); // OFF
   isPumpRunning = false;
-  Serial.printf(">>> PUMP OFF [%s]\n", reason.c_str());
+
   dbWrite("/status/pump_active", "false");
   dbWrite("/control/pump", "false"); 
   dbWrite("/status/last_watered", String(timeClient.getEpochTime()));
@@ -108,7 +139,40 @@ void checkSchedule() {
 
   if (currentH == targetH && currentM == targetM) {
     lastScheduledMinute = currentM; 
-    pumpON("AUTO_SCHEDULE");
+    startPumpLogic("AUTO_SCHEDULE");
+  }
+}
+
+// ---------------- SENSORS & LOGGING ----------------
+
+void readSensors(bool forceLog) {
+  float t = dht.readTemperature();
+  float h = dht.readHumidity();
+  
+  digitalWrite(SOIL_POWER, HIGH); delay(100);
+  int raw = analogRead(SOIL_PIN); digitalWrite(SOIL_POWER, LOW);
+  int percent = map(raw, 1024, 300, 0, 100); 
+  if(percent < 0) percent = 0; if(percent > 100) percent = 100;
+
+  // 1. Realtime Update (Overwrite)
+  if(!isnan(t)) dbWrite("/sensors/dht", "{\"temp\":" + String(t) + ",\"humidity\":" + String(h) + "}");
+  dbWrite("/sensors/soil", "{\"raw\":" + String(raw) + ",\"percent\":" + String(percent) + "}");
+  
+  long rssi = WiFi.RSSI();
+  String ip = WiFi.localIP().toString();
+  dbWrite("/device", "{\"ip\":\"" + ip + "\",\"rssi\":" + String(rssi) + ",\"ver\":\"2.3-SECURE\"}");
+
+  // 2. History Log (Push) - Runs every hour
+  if (forceLog) {
+    unsigned long ts = timeClient.getEpochTime();
+    // Structure: { "ts": 17123456, "t": 25.5, "h": 60, "s": 45 }
+    String logJson = "{\"ts\":" + String(ts) + 
+                     ",\"t\":" + String(t) + 
+                     ",\"h\":" + String(h) + 
+                     ",\"s\":" + String(percent) + "}";
+    
+    Serial.println(">>> LOGGING HISTORY: " + logJson);
+    dbPush("/history", logJson);
   }
 }
 
@@ -124,7 +188,8 @@ void setup() {
   timeClient.begin();
   ArduinoOTA.setHostname("SmartGardenESP");
   ArduinoOTA.begin();
-  pumpOFF("BOOT");
+  
+  stopPumpLogic("BOOT");
 }
 
 void loop() {
@@ -136,46 +201,24 @@ void loop() {
   if (now - lastPoll > POLL_INTERVAL_MS) {
     lastPoll = now;
     String cmd = dbRead("/control/pump");
-    if (cmd == "true") pumpON("MANUAL");
-    else if (cmd == "false" && isPumpRunning) pumpOFF("MANUAL");
-    
-    // Only check schedule if pump is OFF (save bandwidth)
+    if (cmd == "true") { if (!isPumpRunning) startPumpLogic("MANUAL"); } 
+    else if (cmd == "false" && isPumpRunning) { stopPumpLogic("MANUAL"); }
     if (!isPumpRunning) checkSchedule();
   }
 
-  // 2. Safety Cutoff
+  // 2. SAFETY TIMER
   if (isPumpRunning) {
-    unsigned long limit = (unsigned long)HARD_LIMIT_SEC * 1000UL;
     unsigned long elapsed = millis() - pumpStartTime; 
-    
-    // Debug Timer every 0.5s
-    if (now - lastDebugPrint > 500) {
-       lastDebugPrint = now;
-       Serial.printf("Timer: %lu / %lu ms\n", elapsed, limit);
-    }
-
-    if (elapsed > limit) pumpOFF("SAFETY");
+    if (elapsed > currentDurationLimit) stopPumpLogic("SAFETY");
   }
 
-  // 3. Sensors
+  // 3. SENSORS (Realtime every 10s)
   if (now - lastSensor > SENSOR_INTERVAL_MS) {
     lastSensor = now;
-    readSensors();
+    // Check if we also need to log history (Every 1 Hour)
+    bool shouldLog = (now - lastHistoryLog > HISTORY_INTERVAL_MS);
+    if (shouldLog) lastHistoryLog = now;
+    
+    readSensors(shouldLog);
   }
-}
-
-void readSensors() {
-  float t = dht.readTemperature();
-  float h = dht.readHumidity();
-  digitalWrite(SOIL_POWER, HIGH); delay(100);
-  int raw = analogRead(SOIL_PIN); digitalWrite(SOIL_POWER, LOW);
-  int percent = map(raw, 1024, 300, 0, 100); 
-  if(percent < 0) percent = 0; if(percent > 100) percent = 100;
-
-  if(!isnan(t)) dbWrite("/sensors/dht", "{\"temp\":" + String(t) + ",\"humidity\":" + String(h) + "}");
-  dbWrite("/sensors/soil", "{\"raw\":" + String(raw) + ",\"percent\":" + String(percent) + "}");
-  
-  long rssi = WiFi.RSSI();
-  String ip = WiFi.localIP().toString();
-  dbWrite("/device", "{\"ip\":\"" + ip + "\",\"rssi\":" + String(rssi) + ",\"ver\":\"1.7-FAST\"}");
 }
