@@ -69,4 +69,10 @@ SECURITY EXCLUSIONS
 
 -----------------------
 
-firebase_options.dart**/secrets.h
+firebase_options.dart
+**/secrets.h
+
+PLAY STORE SIGNING KEYS (CRITICAL)
+
+*.jks
+key.properties

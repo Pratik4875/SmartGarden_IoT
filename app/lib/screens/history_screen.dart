@@ -66,19 +66,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildChartCard(
-                    "Soil Moisture History",
+                    "Soil Moisture",
                     _soilPoints,
                     Colors.greenAccent,
                     0,
                     100,
+                    "%",
                   ),
                   const SizedBox(height: 20),
                   _buildChartCard(
-                    "Temperature History",
+                    "Temperature",
                     _tempPoints,
                     Colors.orangeAccent,
                     0,
                     50,
+                    "°C",
                   ),
                 ],
               ),
@@ -92,27 +94,50 @@ class _HistoryScreenState extends State<HistoryScreen> {
     Color color,
     double minY,
     double maxY,
+    String unit,
   ) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: const Color(0xFF2C2C2C),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: GoogleFonts.poppins(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                points.isNotEmpty
+                    ? "${points.last.y.toStringAsFixed(1)}$unit"
+                    : "--",
+                style: GoogleFonts.poppins(
+                  color: color,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 20),
-          SizedBox(
-            height: 200,
+          const SizedBox(height: 30),
+          AspectRatio(
+            aspectRatio: 1.70,
             child: points.isEmpty
                 ? Center(
                     child: Text(
@@ -122,8 +147,43 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   )
                 : LineChart(
                     LineChartData(
-                      gridData: FlGridData(show: false),
-                      titlesData: FlTitlesData(show: false),
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        horizontalInterval: (maxY - minY) / 5,
+                        getDrawingHorizontalLine: (value) {
+                          return FlLine(color: Colors.white10, strokeWidth: 1);
+                        },
+                      ),
+                      titlesData: FlTitlesData(
+                        show: true,
+                        rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        bottomTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            interval: (maxY - minY) / 5,
+                            getTitlesWidget: (value, meta) {
+                              return Text(
+                                value.toInt().toString(),
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                ),
+                              );
+                            },
+                            reservedSize: 30,
+                          ),
+                        ),
+                      ),
                       borderData: FlBorderData(show: false),
                       minX: 0,
                       maxX: points.length.toDouble() - 1,
@@ -133,16 +193,40 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         LineChartBarData(
                           spots: points,
                           isCurved: true,
+                          curveSmoothness: 0.35,
                           color: color,
-                          barWidth: 3,
+                          barWidth: 4,
                           isStrokeCapRound: true,
                           dotData: FlDotData(show: false),
                           belowBarData: BarAreaData(
                             show: true,
-                            color: color.withOpacity(0.2),
+                            gradient: LinearGradient(
+                              colors: [
+                                color.withValues(alpha: 0.3),
+                                color.withValues(alpha: 0.0),
+                              ],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ),
                           ),
                         ),
                       ],
+                      lineTouchData: LineTouchData(
+                        touchTooltipData: LineTouchTooltipData(
+                          getTooltipColor: (touchedSpot) => Colors.black87,
+                          getTooltipItems: (List<LineBarSpot> touchedBarSpots) {
+                            return touchedBarSpots.map((barSpot) {
+                              return LineTooltipItem(
+                                '${barSpot.y}$unit',
+                                const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              );
+                            }).toList();
+                          },
+                        ),
+                      ),
                     ),
                   ),
           ),

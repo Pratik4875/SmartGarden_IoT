@@ -44,7 +44,6 @@ class _SplashScreenState extends State<SplashScreen>
           ),
         );
       } else {
-        // Fallback if somehow we got here without a URL
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const LoginScreen()),
         );
@@ -60,11 +59,8 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    // ... (Keep your existing UI code for the Logo/Text) ...
-    // ... just changing the class logic above ...
-    // Paste the UI from previous step here
     return Scaffold(
-      backgroundColor: const Color(0xFF1E1E1E), // Dark Theme Background
+      backgroundColor: const Color(0xFF1E1E1E),
       body: Center(
         child: FadeTransition(
           opacity: _opacity,
@@ -75,7 +71,7 @@ class _SplashScreenState extends State<SplashScreen>
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.greenAccent.withOpacity(0.1),
+                  color: Colors.greenAccent.withValues(alpha: 0.1), // FIXED
                   border: Border.all(color: Colors.greenAccent, width: 2),
                 ),
                 child: const Icon(
@@ -86,7 +82,7 @@ class _SplashScreenState extends State<SplashScreen>
               ),
               const SizedBox(height: 30),
               Text(
-                'ECOSYNC', // UPDATED NAME
+                'ECOSYNC',
                 style: GoogleFonts.poppins(
                   color: Colors.white,
                   fontSize: 28,

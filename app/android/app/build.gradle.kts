@@ -1,3 +1,7 @@
+// 1. ADD THESE IMPORTS AT THE VERY TOP
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("com.google.gms.google-services")
@@ -11,11 +15,8 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        // Use Java 8 (Required for Desugaring)
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
-        
-        // 1. ENABLE DESUGARING
         isCoreLibraryDesugaringEnabled = true
     }
 
@@ -25,18 +26,31 @@ android {
 
     defaultConfig {
         applicationId = "com.example.app"
-        
-        // 2. MIN SDK & MULTIDEX
-        minSdk = flutter.minSdkVersion 
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        multiDexEnabled = true 
+        multiDexEnabled = true
+    }
+
+    // 2. FIXED SIGNING CONFIG BLOCK
+    signingConfigs {
+        create("release") {
+            val keystoreFile = project.rootProject.file("key.properties")
+            val properties = Properties() // Now works because we imported it
+            if (keystoreFile.exists()) {
+                properties.load(FileInputStream(keystoreFile)) // Now works
+                keyAlias = properties.getProperty("keyAlias")
+                keyPassword = properties.getProperty("keyPassword")
+                storeFile = file(properties.getProperty("storeFile"))
+                storePassword = properties.getProperty("storePassword")
+            }
+        }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             isShrinkResources = false
         }
@@ -48,8 +62,6 @@ flutter {
 }
 
 dependencies {
-    // 3. UPDATED LIBRARY VERSION (The Fix)
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4") 
-    
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     implementation("androidx.multidex:multidex:2.0.1")
 }

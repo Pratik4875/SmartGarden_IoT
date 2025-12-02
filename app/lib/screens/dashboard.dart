@@ -3,13 +3,14 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:ota_update/ota_update.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/iot_service.dart';
 import 'login_screen.dart';
 import 'history_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final String databaseUrl;
-  final IoTService? iotServiceOverride; // INJECTION POINT
+  final IoTService? iotServiceOverride;
 
   const DashboardScreen({
     super.key,
@@ -27,13 +28,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    // Use the override if provided (for tests), otherwise create real service
     _iot = widget.iotServiceOverride ?? IoTService(widget.databaseUrl);
   }
-
-  // ... (REST OF THE FILE REMAINS EXACTLY THE SAME AS BEFORE) ...
-  // Paste the rest of the Dashboard code here (build method, helpers, SchedulerCard, etc.)
-  // ensuring you don't lose the existing logic.
 
   void _runUpdate(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -43,20 +39,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
     _iot.updateApp().listen(
       (OtaEvent event) {
-        print("OTA Status: ${event.status} : ${event.value}");
+        debugPrint("OTA Status: ${event.status} : ${event.value}");
       },
       onError: (error) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Update Error: $error"),
-            backgroundColor: Colors.red,
-          ),
-        );
+        // Fix: Check mounted before using context in async callback
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Update Error: $error"),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       },
     );
   }
 
-  void _logout(BuildContext context) {
+  Future<void> _logout(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    // Fix: Check mounted before using context after await
+    if (!mounted) return;
+
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (context) => const LoginScreen()),
     );
@@ -98,23 +102,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildStatusHeader(),
-              const SizedBox(height: 30),
-              _buildSensorGrid(),
-              const SizedBox(height: 30),
-              SchedulerCard(iotService: _iot),
-              const SizedBox(height: 30),
-              _buildPumpControl(),
-              const SizedBox(height: 20),
-            ],
-          ),
-        ),
+      body: FutureBuilder(
+        future: _iot.ready,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(color: Colors.greenAccent),
+                  SizedBox(height: 20),
+                  Text(
+                    "Authenticating Securely...",
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          if (snapshot.hasError) {
+            return Center(
+              child: Text(
+                "Security Error: ${snapshot.error}",
+                style: const TextStyle(color: Colors.redAccent),
+              ),
+            );
+          }
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildStatusHeader(),
+                const SizedBox(height: 30),
+                _buildSensorGrid(),
+                const SizedBox(height: 30),
+                SchedulerCard(iotService: _iot),
+                const SizedBox(height: 30),
+                _buildPumpControl(),
+                const SizedBox(height: 20),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -189,7 +221,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           decoration: BoxDecoration(
             color: const Color(0xFF2C2C2C),
             borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: color.withOpacity(0.3)),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -237,8 +269,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: (isPumpOn ? Colors.red : Colors.green).withOpacity(
-                    0.4,
+                  color: (isPumpOn ? Colors.red : Colors.green).withValues(
+                    alpha: 0.4,
                   ),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
@@ -281,10 +313,8 @@ class _SchedulerCardState extends State<SchedulerCard> {
   @override
   void initState() {
     super.initState();
-    // Listen to Duration Stream to populate initial value
     widget.iotService.scheduleDurationStream.listen((event) {
       if (mounted && event.snapshot.value != null) {
-        // Prevent overwriting while user is typing
         if (_isInit) {
           _durationController.text = event.snapshot.value.toString();
           _isInit = false;
@@ -329,7 +359,8 @@ class _SchedulerCardState extends State<SchedulerCard> {
                       snapshot.data!.snapshot.value == true);
                   return Switch(
                     value: _isEnabled,
-                    activeColor: Colors.greenAccent,
+                    activeTrackColor: Colors.greenAccent,
+                    thumbColor: WidgetStateProperty.all(Colors.white),
                     onChanged: (val) {
                       int dur = int.tryParse(_durationController.text) ?? 15;
                       widget.iotService.setSchedule(val, null, dur);
@@ -339,9 +370,7 @@ class _SchedulerCardState extends State<SchedulerCard> {
               ),
             ],
           ),
-
           const SizedBox(height: 10),
-
           StreamBuilder<DatabaseEvent>(
             stream: widget.iotService.scheduleTimeStream,
             builder: (context, snapshot) {
@@ -404,7 +433,6 @@ class _SchedulerCardState extends State<SchedulerCard> {
               );
             },
           ),
-
           Padding(
             padding: const EdgeInsets.only(top: 16.0),
             child: TextField(

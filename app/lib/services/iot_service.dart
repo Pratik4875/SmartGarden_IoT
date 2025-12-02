@@ -1,42 +1,50 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:ota_update/ota_update.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:flutter/foundation.dart'; // For debugPrint
+import 'package:flutter/foundation.dart';
 
 class IoTService {
   late final DatabaseReference _db;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  // NEW: A public future that the UI can wait for
+  late final Future<void> ready;
 
   IoTService(String databaseUrl) {
-    debugPrint("🔌 IoTService Initializing with URL: $databaseUrl");
-    try {
-      FirebaseDatabase instance = FirebaseDatabase.instanceFor(
-        app: Firebase.app(),
-        databaseURL: databaseUrl,
-      );
-      _db = instance.ref();
+    // 1. Initialize Database Reference immediately (so UI doesn't crash)
+    FirebaseDatabase instance = FirebaseDatabase.instanceFor(
+      app: Firebase.app(),
+      databaseURL: databaseUrl,
+    );
+    _db = instance.ref();
 
-      // Test Connection
-      _db
-          .child('status')
-          .get()
-          .then((_) {
-            debugPrint("✅ Database Connected Successfully!");
-          })
-          .catchError((e) {
-            debugPrint("❌ Database Connection Failed: $e");
-          });
+    // 2. Perform Auth Handshake and save the Future
+    ready = _authenticate();
+  }
+
+  Future<void> _authenticate() async {
+    try {
+      // Check if already signed in
+      if (_auth.currentUser == null) {
+        debugPrint("🔒 Attempting Anonymous Sign-In...");
+        await _auth.signInAnonymously();
+        debugPrint("✅ Signed In! User ID: ${_auth.currentUser?.uid}");
+      } else {
+        debugPrint("✅ Already Signed In: ${_auth.currentUser?.uid}");
+      }
     } catch (e) {
-      debugPrint("❌ Critical Error Initializing DB: $e");
+      debugPrint("❌ CRITICAL AUTH ERROR: $e");
+      // If this fails, Firebase Rules will block all data.
     }
   }
 
-  // --- STREAMS ---
-  // Added error handling to streams
-  Stream<DatabaseEvent> get pumpStatusStream => _db
-      .child('control/pump')
-      .onValue
-      .handleError((e) => debugPrint("Stream Error (Pump): $e"));
+  // ... (Rest of your code: Streams, Actions, etc.) ...
+  // Paste the rest of your existing file here
+
+  Stream<DatabaseEvent> get pumpStatusStream =>
+      _db.child('control/pump').onValue;
   Stream<DatabaseEvent> get tempStream => _db.child('sensors/dht/temp').onValue;
   Stream<DatabaseEvent> get humidityStream =>
       _db.child('sensors/dht/humidity').onValue;
@@ -52,19 +60,10 @@ class IoTService {
   Stream<DatabaseEvent> get scheduleDurationStream =>
       _db.child('config/scheduler/duration_sec').onValue;
 
-  // --- ACTIONS ---
-
   Future<void> togglePump(bool turnOn) async {
-    try {
-      await _db.child('control/pump').set(turnOn);
-      if (turnOn) {
-        await _db.child('control/request_time').set(ServerValue.timestamp);
-      }
-    } catch (e) {
-      debugPrint("❌ Error Toggling Pump: $e");
-      // You could throw this to show a Snackbar in UI
-      rethrow;
-    }
+    await _db.child('control/pump').set(turnOn);
+    if (turnOn)
+      await _db.child('control/request_time').set(ServerValue.timestamp);
   }
 
   Future<void> setSchedule(
@@ -72,92 +71,52 @@ class IoTService {
     DateTime? localTime,
     int? duration,
   ) async {
-    try {
-      Map<String, Object> updates = {};
-      updates['config/scheduler/enabled'] = enabled;
-
-      if (duration != null) updates['config/scheduler/duration_sec'] = duration;
-
-      if (localTime != null) {
-        DateTime utcTime = localTime.toUtc();
-        String hour = utcTime.hour.toString().padLeft(2, '0');
-        String minute = utcTime.minute.toString().padLeft(2, '0');
-        updates['config/scheduler/time_utc'] = "$hour:$minute";
-      }
-
-      await _db.update(updates);
-    } catch (e) {
-      debugPrint("❌ Error Setting Schedule: $e");
+    Map<String, Object> updates = {};
+    updates['config/scheduler/enabled'] = enabled;
+    if (duration != null) updates['config/scheduler/duration_sec'] = duration;
+    if (localTime != null) {
+      DateTime utcTime = localTime.toUtc();
+      String hour = utcTime.hour.toString().padLeft(2, '0');
+      String minute = utcTime.minute.toString().padLeft(2, '0');
+      updates['config/scheduler/time_utc'] = "$hour:$minute";
     }
+    await _db.update(updates);
   }
 
-  // --- AUTO UPDATE ---
   Stream<OtaEvent> updateApp() {
-    try {
-      return OtaUpdate().execute(
-        'https://github.com/Pratik4875/SmartGarden_IoT/releases/latest/download/app-release.apk',
-        destinationFilename: 'app-release.apk',
-      );
-    } catch (e) {
-      debugPrint('❌ OTA Error: $e');
-      rethrow;
-    }
+    return OtaUpdate().execute(
+      'https://github.com/Pratik4875/SmartGarden_IoT/releases/latest/download/EcoSync.apk',
+      destinationFilename: 'EcoSync.apk',
+    );
   }
 
-  // --- ANALYTICS (Robust) ---
   Future<List<List<FlSpot>>> getHistoryData() async {
-    debugPrint("📊 Fetching History Data...");
-    try {
-      final snapshot = await _db.child('history').get();
-
-      List<FlSpot> tempSpots = [];
-      List<FlSpot> soilSpots = [];
-
-      if (snapshot.exists && snapshot.value != null) {
-        debugPrint(
-          "📊 History Data Found: ${snapshot.children.length} entries",
-        );
-
-        // Handle different data structures (List vs Map)
-        List<Map<dynamic, dynamic>> safeEntries = [];
-
-        if (snapshot.value is List) {
-          var list = snapshot.value as List;
-          for (var item in list) {
-            if (item != null) safeEntries.add(item as Map);
-          }
-        } else if (snapshot.value is Map) {
-          var map = snapshot.value as Map;
-          map.forEach((key, value) {
-            safeEntries.add(value as Map);
-          });
-        }
-
-        // Sort
-        safeEntries.sort((a, b) => (a['ts'] ?? 0).compareTo(b['ts'] ?? 0));
-
-        // Limit
-        if (safeEntries.length > 24) {
-          safeEntries = safeEntries.sublist(safeEntries.length - 24);
-        }
-
+    final snapshot = await _db.child('history').get();
+    List<FlSpot> tempSpots = [];
+    List<FlSpot> soilSpots = [];
+    if (snapshot.exists && snapshot.value != null) {
+      // (Your existing history parsing logic here)
+      // If parsing fails, just return empty lists
+      try {
+        Map<dynamic, dynamic> values = snapshot.value as Map<dynamic, dynamic>;
+        var entries = values.entries.toList();
+        entries.sort((a, b) => a.value['ts'].compareTo(b.value['ts']));
+        if (entries.length > 24) entries = entries.sublist(entries.length - 24);
         int index = 0;
-        for (var data in safeEntries) {
-          double t = (data['t'] as num? ?? 0).toDouble();
-          double s = (data['s'] as num? ?? 0).toDouble();
-
-          tempSpots.add(FlSpot(index.toDouble(), t));
-          soilSpots.add(FlSpot(index.toDouble(), s));
+        for (var entry in entries) {
+          var data = entry.value;
+          tempSpots.add(
+            FlSpot(index.toDouble(), (data['t'] as num).toDouble()),
+          );
+          soilSpots.add(
+            FlSpot(index.toDouble(), (data['s'] as num).toDouble()),
+          );
           index++;
         }
-      } else {
-        debugPrint("⚠️ No History Data Found in DB");
+      } catch (e) {
+        debugPrint("Error parsing history: $e");
       }
-
-      return [tempSpots, soilSpots];
-    } catch (e) {
-      debugPrint("❌ Error Fetching History: $e");
-      return [[], []]; // Return empty lists so graph doesn't crash
     }
+    return [tempSpots, soilSpots];
   }
 }
