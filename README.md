@@ -1,93 +1,103 @@
-SmartGarden IoT 🌿
+🌱 EcoSync IoT
 
-A professional, solar-powered IoT irrigation system. This project integrates an ESP8266 microcontroller with Firebase Realtime Database and a Flutter App to provide global access to pump controls and sensor telemetry.
+Smart Automation for a Greener Home. 🌿
+
+EcoSync transforms your garden into a secure, data-driven IoT ecosystem. It combines a solar-powered ESP8266 controller with a professional Flutter app to provide real-time telemetry, precision watering schedules, and historical analytics—all secured by enterprise-grade authentication.
 
 📱 App Interface
 
-Dashboard
+Secure Login Hub
 
-Real-Time Control
+Real-Time Dashboard
 
-Add screenshots here
+Analytics & History
 
-Add screenshots here
+<img src="docs/login.png" width="250" alt="Login Screen">
 
-🔒 Security Setup (Important)
+<img src="docs/dashboard.png" width="250" alt="Dashboard">
 
-This repository follows strict security practices. Private credentials are not included.
+<img src="docs/history.png" width="250" alt="History Graphs">
 
-To Run the Firmware:
+Connect securely to your personal IoT Hub.
 
-Navigate to Arduino/src/.
+Control pump, set schedules, and view sensors.
 
-Rename secrets_template.h to secrets.h.
+Visualize temp/moisture trends over 24h.
 
-Fill in your credentials:
+🚀 Key Features
 
-#define WIFI_SSID "your_wifi"
-#define WIFI_PASSWORD "your_password"
-#define API_KEY "your_firebase_api_key"
-#define DB_URL "your_db_url"
+🔒 Enterprise Security
 
+Hub Connection: No hardcoded secrets. Users connect via a secure Login Screen.
 
-To Run the App:
+Anonymous Auth: Silent, encrypted handshake ensures only your app talks to the database.
 
-You must generate your own firebase_options.dart using flutterfire configure.
+Database Secrets: Firmware uses privileged Admin tokens to bypass locked rules safely.
+
+⏱️ Precision Automation
+
+Daily Scheduler: Set specific start times and exact durations (e.g., "Water for 15 seconds at 9:00 AM").
+
+Unified Logic: Intelligent firmware resolves conflicts between Manual overrides and Scheduled tasks.
+
+Safety Cutoff: Hard-coded dynamic limit prevents flooding even if WiFi fails.
+
+📊 Data Intelligence
+
+History Logger: ESP8266 snapshots sensor data every 60 minutes.
+
+Interactive Graphs: View Soil Moisture and Temperature trends to optimize plant health.
+
+🔄 DevOps & Quality
+
+Auto-Update: The app intelligently checks GitHub Releases and installs new versions (v1.4+) automatically.
+
+Power Optimization: WIFI_NONE_SLEEP mode ensures compatibility with power banks by preventing auto-shutdown.
 
 🏗 Architecture
 
-The system operates on a dual-power architecture (Solar + Lithium Battery) and uses a bi-directional data stream:
+The system operates on a Dual-Power Architecture (Solar + Lithium Buffer) and uses a robust REST API protocol.
 
-Uplink (Telemetry): ESP8266 pushes DHT11 (Temp/Hum) and Capacitive Soil data to Firebase every 10 seconds.
+Uplink (Telemetry): Pushes DHT11 and Soil data every 10 seconds.
 
-Downlink (Control): ESP8266 polls Firebase (500ms interval) for pump_switch status.
+Downlink (Control): Polls command queue every 200ms for instant reaction.
+
+Loglink (History): Pushes snapshot to /history every 1 hour.
 
 🔌 Hardware Stack
 
 MCU: ESP8266 (NodeMCU/Wemos D1 Mini)
 
-Sensors: * DHT11 (Temperature & Humidity)
+Sensors: DHT11 (Temp/Hum), Capacitive Soil Moisture v1.2
 
-Capacitive Soil Moisture Sensor v1.2
+Actuators: 5V Relay (Active Low / Open-Drain)
 
-Actuators: 5V Relay (Open-Drain Configuration)
+Power: 45x80mm Solar Panel → TP4056 → Li-Ion → 5V Boost
 
-Power System:
+🛠️ Installation Guide
 
-45x80mm Solar Panel (4.45V) -> TP4056 -> Li-Ion Battery (Pump)
+1. Firmware (ESP8266)
 
-5000mAh Power Bank (MCU)
+Clone this repo.
 
-🚀 Key Features
+Navigate to Arduino/src/.
 
-Global Remote Control: Toggle water pump from anywhere via Flutter App.
+Rename secrets_template.h to secrets.h.
 
-Power Bank Keep-Alive: Firmware v1.5 uses WIFI_NONE_SLEEP to prevent power banks from auto-shutting down due to low current draw.
+Add your WiFi creds and Database Secret (from Firebase Console).
 
-Safety Cutoff: Hard-coded 2000s limit prevents flooding if connectivity is lost.
+Flash via USB (recommended for security updates) or OTA.
 
-Integer Overflow Protection: Custom timer logic prevents "time travel" bugs during long uptime.
-
-🛠️ Installation
-
-Firmware (ESP8266)
-
-Clone the repo.
-
-Open Arduino/ in VS Code (PlatformIO) or Arduino IDE.
-
-Setup secrets.h.
-
-Flash to device.
-
-Mobile App (Flutter)
+2. Mobile App (Flutter)
 
 Navigate to app/.
 
 Run flutter pub get.
 
-Run flutter run.
+Run flutter build apk --release or install via Releases.
 
 📄 License
 
 Distributed under the MIT License. See LICENSE for more information.
+
+Built with 💚 by Pratik4875
