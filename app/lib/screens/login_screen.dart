@@ -99,6 +99,14 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   @override
+  void dispose() {
+    _urlController.dispose();
+    _wifiSsidController.dispose();
+    _wifiPassController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0F2027),
@@ -200,36 +208,39 @@ class _LoginScreenState extends State<LoginScreen> {
                   // SLIDE TO CONNECT (With Tick Animation)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: SlideAction(
-                      key: _slideKey,
-                      borderRadius: 16,
-                      elevation: 0,
-                      height: 60,
-                      outerColor: Colors.cyanAccent.withValues(alpha: 0.9),
-                      innerColor: const Color(0xFF0F2027),
+                    child: Container(
+                      key: const Key('loginSliderArea'), // stable test key
+                      child: SlideAction(
+                        key: _slideKey, // keep the GlobalKey for reset() usage
+                        borderRadius: 16,
+                        elevation: 0,
+                        height: 60,
+                        outerColor: Colors.cyanAccent.withValues(alpha: 0.9),
+                        innerColor: const Color(0xFF0F2027),
 
-                      // Text
-                      text: "SLIDE TO CONNECT",
-                      textStyle: GoogleFonts.poppins(
-                        color: const Color(0xFF0F2027),
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
-                      ),
+                        // Text
+                        text: "SLIDE TO CONNECT",
+                        textStyle: GoogleFonts.poppins(
+                          color: const Color(0xFF0F2027),
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                        ),
 
-                      // Icons
-                      sliderButtonIcon: const Icon(
-                        Icons.arrow_forward_rounded,
-                        color: Colors.cyanAccent,
-                      ),
-                      submittedIcon: const Icon(
-                        Icons.check_rounded, // The TICK you wanted!
-                        color: Colors.cyanAccent,
-                        size: 30,
-                      ),
+                        // Icons
+                        sliderButtonIcon: const Icon(
+                          Icons.arrow_forward_rounded,
+                          color: Colors.cyanAccent,
+                        ),
+                        submittedIcon: const Icon(
+                          Icons.check_rounded, // The TICK you wanted!
+                          color: Colors.cyanAccent,
+                          size: 30,
+                        ),
 
-                      // Action
-                      onSubmit: _handleConnect,
+                        // Action
+                        onSubmit: _handleConnect,
+                      ),
                     ),
                   ),
                 ],

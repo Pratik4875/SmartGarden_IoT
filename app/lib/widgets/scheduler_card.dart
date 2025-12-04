@@ -112,9 +112,10 @@ class _SchedulerCardState extends State<SchedulerCard> {
                       (snapshot.hasData &&
                       snapshot.data!.snapshot.value == true);
                   return Switch(
+                    key: const Key('schedulerSwitch'), // <-- test key
                     value: _isEnabled,
                     activeTrackColor: Colors.cyanAccent, // CYAN
-                    thumbColor: WidgetStateProperty.all(
+                    thumbColor: MaterialStateProperty.all(
                       Colors.black,
                     ), // BLACK KNOB
                     onChanged: (val) {

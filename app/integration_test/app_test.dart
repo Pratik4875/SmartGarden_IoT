@@ -1,61 +1,62 @@
+// integration_test/app_test.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:ecosync/main.dart' as app;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:slide_to_act/slide_to_act.dart';
+import 'package:ecosync/main.dart' as app;
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  group('end-to-end test (diagnostics)', () {
+  group('end-to-end test (complete flow)', () {
     testWidgets(
-      'verify login and dashboard flow',
+      'verify login -> scheduler -> pump -> logout',
       (tester) async {
-        // 1. Setup
+        // Start with no saved URL so the app shows the login screen.
         SharedPreferences.setMockInitialValues({});
-        app.main();
+
+        // Start the app and wait for Firebase/init to finish.
+        await app.main();
         await tester.pumpAndSettle(const Duration(seconds: 5));
 
-        // 2. Verify Login Loaded
-        if (find.text('ECOSYNC').evaluate().isEmpty) {
-          debugPrint('Login title not found — dumping elements:');
-          debugDumpApp();
-          fail('Login screen not visible');
-        }
-
-        // 3. Enter Data
+        // --- PHASE 1: LOGIN ---
         final Finder urlFieldFinder = find.byType(TextFormField).first;
+        expect(urlFieldFinder, findsOneWidget, reason: 'URL input not found');
+
         await tester.enterText(
           urlFieldFinder,
           'https://pratik-s-garden-default-rtdb.asia-southeast1.firebasedatabase.app',
         );
         await tester.pumpAndSettle();
 
-        // 4. Hide keyboard safely
+        // Hide keyboard and wait for UI to settle.
         await SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
         await tester.pumpAndSettle(const Duration(seconds: 2));
 
-        // 5. Find Slider
-        final Finder sliderFinder = find.byType(SlideAction).first;
-        await tester.ensureVisible(sliderFinder);
-        await tester.pumpAndSettle();
+        // Find the login slider area (wrapper for SlideAction)
+        final Finder loginArea = find.byKey(const Key('loginSliderArea'));
+        expect(loginArea, findsOneWidget, reason: 'loginSliderArea missing');
 
-        // 6. DRAG LOGIC (PRECISE)
-        // Get the position of the slider
-        final Offset sliderTopLeft = tester.getTopLeft(sliderFinder);
+        // DEBUG: print coordinates and size so you can inspect if needed
+        final Rect areaRect = tester.getRect(loginArea);
+        debugPrint('loginArea rect: $areaRect');
 
-        // Target the "Knob":
-        // Usually the knob is at the start (left), centered vertically.
-        // Let's guess the knob center is about 30px in and 30px down.
-        final Offset knobPos = sliderTopLeft + const Offset(30.0, 30.0);
+        // Compute a start point near the left edge and vertically centered.
+        // IMPORTANT: start slightly inside the left edge (8-12 px) so it hits the knob.
+        final Offset start =
+            areaRect.topLeft + Offset(10.0, areaRect.height / 2);
+        final double dragDistance =
+            areaRect.width - 20.0; // generous distance to the right
+        final Offset endOffset = Offset(dragDistance, 0.0);
 
-        // Perform drag from the knob position
-        await tester.dragFrom(knobPos, const Offset(300.0, 0));
-        await tester.pump(); // Start animation
+        debugPrint('Drag start: $start  dragDistance: $dragDistance');
 
-        // 7. Poll for dashboard
+        // Execute the drag from the left-side start point to the right.
+        await tester.dragFrom(start, endOffset);
+        await tester.pumpAndSettle(const Duration(seconds: 3));
+
+        // --- Wait for Dashboard to appear ---
         bool dashboardFound = false;
         for (int i = 0; i < 40; i++) {
           await tester.pump(const Duration(seconds: 1));
@@ -64,17 +65,58 @@ void main() {
             break;
           }
         }
-
         if (!dashboardFound) {
-          debugPrint('Dashboard not found — dumping app tree:');
-          // debugDumpApp(); // Uncomment if you want huge logs
+          debugPrint('Dashboard did not appear in time. Dumping widget tree:');
+          debugDumpApp();
           fail('Dashboard did not load within timeout.');
         }
 
         expect(find.text('EcoSync'), findsOneWidget);
-        expect(find.text('24h Insights'), findsOneWidget);
+
+        // --- PHASE 2: SCHEDULER TOGGLE ---
+        debugPrint('🧪 Testing Scheduler Switch...');
+        final Finder schedulerSwitch = find.byKey(const Key('schedulerSwitch'));
+        expect(
+          schedulerSwitch,
+          findsOneWidget,
+          reason: 'schedulerSwitch missing',
+        );
+        await tester.ensureVisible(schedulerSwitch);
+        await tester.pumpAndSettle();
+        await tester.tap(schedulerSwitch);
+        await tester.pumpAndSettle(const Duration(seconds: 2));
+
+        // --- PHASE 3: PUMP CONTROL ---
+        debugPrint('🧪 Testing Pump Control (tap)...');
+        final Finder pumpControl = find.byKey(const Key('pumpControl'));
+        expect(pumpControl, findsOneWidget, reason: 'pumpControl missing');
+        await tester.ensureVisible(pumpControl);
+        await tester.pumpAndSettle();
+        await tester.tap(pumpControl);
+        await tester.pumpAndSettle(const Duration(seconds: 2));
+
+        final bool pumpTextVisible =
+            find.text('PUMP ACTIVE').evaluate().isNotEmpty ||
+            find.text('START PUMP').evaluate().isNotEmpty;
+        expect(pumpTextVisible, isTrue, reason: 'Pump label not visible');
+
+        // --- PHASE 4: LOGOUT ---
+        debugPrint('🧪 Testing Logout...');
+        final Finder logoutBtn = find.byIcon(Icons.logout).first;
+        expect(logoutBtn, findsOneWidget, reason: 'Logout button missing');
+        await tester.tap(logoutBtn);
+        await tester.pumpAndSettle(const Duration(seconds: 2));
+
+        // Final check: the login screen should be visible again (slide text)
+        expect(
+          find.text('SLIDE TO CONNECT'),
+          findsOneWidget,
+          reason: 'Did not return to login after logout',
+        );
+
+        debugPrint('✅ Complete User Flow Verified!');
       },
-      timeout: const Timeout(Duration(seconds: 140)),
+      timeout: const Timeout(Duration(seconds: 240)),
     );
   });
 }

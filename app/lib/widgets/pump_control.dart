@@ -18,32 +18,49 @@ class PumpControl extends StatelessWidget {
           isPumpOn = true;
         }
 
-        // Active = Cyan/Blue Gradient, Inactive = Dark Grey
+        // Active = Cyan/Blue Gradient
+        // Inactive = Dark Grey
         final gradientColors = isPumpOn
             ? [Colors.cyanAccent, Colors.blueAccent]
             : [Colors.grey.shade800, Colors.grey.shade900];
 
         final textColor = isPumpOn ? Colors.black : Colors.white54;
-        final shadowColor = isPumpOn
-            ? Colors.cyanAccent.withValues(alpha: 0.4)
-            : Colors.black;
 
-        return GestureDetector(
-          onTap: () => iotService.togglePump(!isPumpOn),
-          child: Container(
-            width: double.infinity,
-            height: 80,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: gradientColors),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
+        // Add a glow effect when ON
+        final List<BoxShadow> shadows = isPumpOn
+            ? [
                 BoxShadow(
-                  color: shadowColor,
+                  color: Colors.cyanAccent.withValues(alpha: 0.4),
                   blurRadius: 20,
                   offset: const Offset(0, 5),
                 ),
-              ],
-              border: isPumpOn ? null : Border.all(color: Colors.white10),
+              ]
+            : [
+                const BoxShadow(
+                  color: Colors.black54,
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
+                ),
+              ];
+
+        return GestureDetector(
+          key: const Key('pumpControl'), // <-- test key
+          onTap: () => iotService.togglePump(!isPumpOn),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            width: double.infinity,
+            height: 80,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: gradientColors,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: shadows,
+              border: isPumpOn
+                  ? null
+                  : Border.all(color: Colors.white10, width: 1),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -51,7 +68,7 @@ class PumpControl extends StatelessWidget {
                 Icon(
                   isPumpOn ? Icons.water_drop : Icons.water_drop_outlined,
                   color: textColor,
-                  size: 30,
+                  size: 32,
                 ),
                 const SizedBox(width: 15),
                 Text(
