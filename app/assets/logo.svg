@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Gradient Definitions -->
+  <defs>
+    <!-- Dark Slate to Electric Blue (Cyberpunk/Modern) -->
+    <linearGradient id="mainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0F2027;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2C5364;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00F5FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00D9FF;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background Circle -->
+  <circle cx="256" cy="256" r="256" fill="url(#mainGradient)"/>
+  
+  <!-- White Circle Background for Icon -->
+  <circle cx="256" cy="256" r="180" fill="white"/>
+  
+  <!-- Hub Center (Hexagon) -->
+  <g transform="translate(256, 256)">
+    <!-- Central Hexagon -->
+    <path d="M 0,-50 L 43.3,-25 L 43.3,25 L 0,50 L -43.3,25 L -43.3,-25 Z" 
+          fill="url(#mainGradient)" stroke="none"/>
+    
+    <!-- Leaf inside hexagon -->
+    <path d="M -15,-10 Q -5,-25 5,-30 Q 15,-32 18,-25 Q 18,-15 10,-5 Q 0,5 -10,0 Q -18,-5 -15,-10 Z" 
+          fill="white" opacity="0.9"/>
+    <path d="M 0,-5 Q 8,-10 12,-8" stroke="white" stroke-width="1.5" fill="none" opacity="0.7"/>
+    
+    <!-- Connection Lines -->
+    <!-- Top -->
+    <line x1="0" y1="-50" x2="0" y2="-110" stroke="url(#mainGradient)" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="0" cy="-110" r="18" fill="url(#accentGradient)"/>
+    <circle cx="0" cy="-110" r="8" fill="white"/>
+    
+    <!-- Top Right -->
+    <line x1="43.3" y1="-25" x2="95" y2="-55" stroke="url(#mainGradient)" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="95" cy="-55" r="18" fill="url(#accentGradient)"/>
+    <circle cx="95" cy="-55" r="8" fill="white"/>
+    
+    <!-- Bottom Right -->
+    <line x1="43.3" y1="25" x2="95" y2="55" stroke="url(#mainGradient)" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="95" cy="55" r="18" fill="url(#accentGradient)"/>
+    <circle cx="95" cy="55" r="8" fill="white"/>
+    
+    <!-- Bottom -->
+    <line x1="0" y1="50" x2="0" y2="110" stroke="url(#mainGradient)" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="0" cy="110" r="18" fill="url(#accentGradient)"/>
+    <circle cx="0" cy="110" r="8" fill="white"/>
+    
+    <!-- Bottom Left -->
+    <line x1="-43.3" y1="25" x2="-95" y2="55" stroke="url(#mainGradient)" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="-95" cy="55" r="18" fill="url(#accentGradient)"/>
+    <circle cx="-95" cy="55" r="8" fill="white"/>
+    
+    <!-- Top Left -->
+    <line x1="-43.3" y1="-25" x2="-95" y2="-55" stroke="url(#mainGradient)" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="-95" cy="-55" r="18" fill="url(#accentGradient)"/>
+    <circle cx="-95" cy="-55" r="8" fill="white"/>
+  </g>
+</svg>

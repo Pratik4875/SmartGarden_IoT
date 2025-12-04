@@ -28,7 +28,8 @@
 // ---------------- TIMING ----------------
 #define POLL_INTERVAL_MS 200     
 #define SENSOR_INTERVAL_MS 10000 
-#define HISTORY_INTERVAL_MS 3600000 // 1 Hour (60 * 60 * 1000)
+// CHANGED: 30 Minutes (30 * 60 * 1000)
+#define HISTORY_INTERVAL_MS 1800000 
 
 // ---------------- OBJECTS ----------------
 DHT dht(DHT_PIN, DHT_TYPE);
@@ -154,23 +155,23 @@ void readSensors(bool forceLog) {
   int percent = map(raw, 1024, 300, 0, 100); 
   if(percent < 0) percent = 0; if(percent > 100) percent = 100;
 
-  // 1. Realtime Update (Overwrite)
   if(!isnan(t)) dbWrite("/sensors/dht", "{\"temp\":" + String(t) + ",\"humidity\":" + String(h) + "}");
   dbWrite("/sensors/soil", "{\"raw\":" + String(raw) + ",\"percent\":" + String(percent) + "}");
   
   long rssi = WiFi.RSSI();
   String ip = WiFi.localIP().toString();
-  dbWrite("/device", "{\"ip\":\"" + ip + "\",\"rssi\":" + String(rssi) + ",\"ver\":\"2.3-SECURE\"}");
+  
+  // NEW: Added \"ts\" (Timestamp) for Heartbeat
+  unsigned long currentEpoch = timeClient.getEpochTime();
+  dbWrite("/device", "{\"ip\":\"" + ip + "\",\"rssi\":" + String(rssi) + 
+                     ",\"ts\":" + String(currentEpoch) + ",\"ver\":\"2.3-SECURE\"}");
 
   // 2. History Log (Push) - Runs every hour
   if (forceLog) {
-    unsigned long ts = timeClient.getEpochTime();
-    // Structure: { "ts": 17123456, "t": 25.5, "h": 60, "s": 45 }
-    String logJson = "{\"ts\":" + String(ts) + 
+    String logJson = "{\"ts\":" + String(currentEpoch) + 
                      ",\"t\":" + String(t) + 
                      ",\"h\":" + String(h) + 
                      ",\"s\":" + String(percent) + "}";
-    
     Serial.println(">>> LOGGING HISTORY: " + logJson);
     dbPush("/history", logJson);
   }

@@ -1,108 +1,92 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dashboard.dart';
-import 'login_screen.dart';
+import 'dart:async';
+import '../widgets/custom_loading_animation.dart'; // Import new loader
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  final Duration splashDuration;
+  final WidgetBuilder nextScreenBuilder;
+
+  const SplashScreen({
+    super.key,
+    required this.nextScreenBuilder,
+    this.splashDuration = const Duration(seconds: 3),
+  });
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _opacity;
+class _SplashScreenState extends State<SplashScreen> {
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    );
-    _opacity = Tween<double>(begin: 0.0, end: 1.0).animate(_controller);
-
-    _controller.forward().then((value) {
-      _navigateNext();
-    });
+    _timer = Timer(widget.splashDuration, _navigate);
   }
 
-  Future<void> _navigateNext() async {
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    final prefs = await SharedPreferences.getInstance();
-    final url = prefs.getString('firebase_url');
-
-    if (mounted) {
-      if (url != null && url.isNotEmpty) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => DashboardScreen(databaseUrl: url),
-          ),
-        );
-      } else {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-        );
-      }
-    }
+  void _navigate() {
+    if (!mounted) return;
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: widget.nextScreenBuilder));
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _timer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1E1E1E),
-      body: Center(
-        child: FadeTransition(
-          opacity: _opacity,
+      backgroundColor: const Color(0xFF0F0F10),
+      body: SafeArea(
+        child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.greenAccent.withValues(alpha: 0.1), // FIXED
-                  border: Border.all(color: Colors.greenAccent, width: 2),
-                ),
-                child: const Icon(
-                  Icons.eco,
-                  size: 80,
-                  color: Colors.greenAccent,
-                ),
+              const Spacer(flex: 2),
+
+              // 1. LOGO
+              SizedBox(
+                width: 150,
+                height: 150,
+                child: SvgPicture.asset('assets/logo.svg'),
               ),
-              const SizedBox(height: 30),
+
+              const SizedBox(height: 40),
+
+              // 2. BRANDING TEXT
               Text(
                 'ECOSYNC',
                 style: GoogleFonts.poppins(
                   color: Colors.white,
-                  fontSize: 28,
+                  fontSize: 36,
                   fontWeight: FontWeight.bold,
-                  letterSpacing: 3.0,
+                  letterSpacing: 4.0,
                 ),
               ),
               Text(
-                'Smart Home Automation',
+                'Smart Automation Hub',
                 style: GoogleFonts.poppins(
-                  color: Colors.grey,
+                  color: Colors.cyanAccent,
                   fontSize: 14,
                   letterSpacing: 1.5,
                 ),
               ),
-              const SizedBox(height: 50),
-              const CircularProgressIndicator(
-                color: Colors.greenAccent,
-                strokeWidth: 2,
-              ),
+
+              const Spacer(flex: 1),
+
+              // 3. NEW WAVE ANIMATION
+              const CustomLoadingAnimation(
+                size: 50,
+              ), // 50 looks cleaner than 200 for a footer
+
+              const Spacer(flex: 2),
             ],
           ),
         ),
