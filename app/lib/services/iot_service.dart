@@ -1,312 +1,449 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:ota_update/ota_update.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'notification_service.dart';
 
 class IoTService {
-  late final DatabaseReference _db;
+  DatabaseReference? _db;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final NotificationService _notifications = NotificationService();
 
   late final Future<void> ready;
 
-  // --- SMART MONITORING VARIABLES ---
+  String userName = "User";
+  String? _userPhotoUrl;
+  bool get isConnected => _db != null;
+
+  // Smart Monitoring Variables
   DateTime? _lastDryAlertTime;
   final int _dryThreshold = 30;
-
-  // --- FAILURE DETECTION VARIABLES ---
   int? _startMoisture;
   Timer? _failureCheckTimer;
 
-  IoTService(String databaseUrl) {
-    FirebaseDatabase instance = FirebaseDatabase.instanceFor(
-      app: Firebase.app(),
-      databaseURL: databaseUrl,
-    );
-    _db = instance.ref();
-
+  IoTService() {
     ready = _initialize();
   }
 
   Future<void> _initialize() async {
     try {
       await _notifications.initialize();
+      await _notifications.scheduleDailyReport();
 
-      if (_auth.currentUser == null) {
-        debugPrint("🔒 Attempting Anonymous Sign-In...");
-        await _auth.signInAnonymously();
-        debugPrint("✅ Signed In! User ID: ${_auth.currentUser?.uid}");
+      final prefs = await SharedPreferences.getInstance();
+      userName =
+          prefs.getString('user_name') ??
+          _auth.currentUser?.displayName ??
+          "User";
+      _userPhotoUrl = _auth.currentUser?.photoURL;
+
+      String? savedUrl = prefs.getString('firebase_url');
+
+      if (savedUrl != null && savedUrl.isNotEmpty) {
+        FirebaseDatabase instance = FirebaseDatabase.instanceFor(
+          app: Firebase.app(),
+          databaseURL: savedUrl,
+        );
+        _db = instance.ref();
+        debugPrint("✅ IoT Service Connected to: $savedUrl");
+        _startSmartMonitoring();
       } else {
-        debugPrint("✅ Already Signed In: ${_auth.currentUser?.uid}");
+        _db = null;
+        debugPrint("⚠️ Guest Mode: No Database URL found.");
       }
-
-      _startSmartMonitoring();
     } catch (e) {
-      debugPrint("❌ CRITICAL ERROR: $e");
+      debugPrint("❌ IoT Init Error: $e");
+      _db = null;
     }
   }
 
-  // --- SMART LOGIC ---
+  // --- AUTHENTICATION ---
+
+  static Future<UserCredential?> signInWithGoogle() async {
+    try {
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      if (googleUser == null) {
+        return null;
+      }
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      return await FirebaseAuth.instance.signInWithCredential(credential);
+    } catch (e) {
+      debugPrint("❌ Google Sign-In Error: $e");
+      return null;
+    }
+  }
+
+  Future<UserCredential?> registerWithEmail(
+    String email,
+    String password,
+    String name,
+  ) async {
+    try {
+      UserCredential userCredential = await _auth
+          .createUserWithEmailAndPassword(email: email, password: password);
+      await userCredential.user?.updateDisplayName(name);
+      userName = name;
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_name', name);
+
+      if (isConnected && _db != null) {
+        await _db!.child('users/${userCredential.user!.uid}').set({
+          'name': name,
+          'email': email,
+          'joined': ServerValue.timestamp,
+        });
+      }
+
+      return userCredential;
+    } catch (e) {
+      debugPrint("❌ Registration Error: $e");
+      rethrow;
+    }
+  }
+
+  Future<UserCredential?> loginWithEmail(String email, String password) async {
+    try {
+      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      userName = userCredential.user?.displayName ?? "User";
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_name', userName);
+
+      return userCredential;
+    } catch (e) {
+      debugPrint("❌ Login Error: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> signOut() async {
+    try {
+      await GoogleSignIn().disconnect();
+    } catch (e) {
+      debugPrint("Google disconnect error: $e");
+    }
+    await _auth.signOut();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+  }
+
+  // --- STREAMS ---
+  Stream<bool> get onlineStatusStream {
+    if (!isConnected) {
+      return Stream.value(false);
+    }
+    return _db!.child('device/ts').onValue.map((event) {
+      if (event.snapshot.value == null) {
+        return false;
+      }
+      int lastSeen = int.tryParse(event.snapshot.value.toString()) ?? 0;
+      int now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      return (now - lastSeen).abs() < 120;
+    });
+  }
+
+  Stream<DatabaseEvent> get pumpStatusStream =>
+      _db?.child('control/pump').onValue ?? const Stream<DatabaseEvent>.empty();
+  Stream<DatabaseEvent> get tempStream =>
+      _db?.child('sensors/dht/temp').onValue ??
+      const Stream<DatabaseEvent>.empty();
+  Stream<DatabaseEvent> get humidityStream =>
+      _db?.child('sensors/dht/humidity').onValue ??
+      const Stream<DatabaseEvent>.empty();
+  Stream<DatabaseEvent> get soilStream =>
+      _db?.child('sensors/soil/percent').onValue ??
+      const Stream<DatabaseEvent>.empty();
+  Stream<DatabaseEvent> get lastWateredStream =>
+      _db?.child('status/last_watered').onValue ??
+      const Stream<DatabaseEvent>.empty();
+  Stream<DatabaseEvent> get deviceLastSeenStream =>
+      _db?.child('device/ts').onValue ?? const Stream<DatabaseEvent>.empty();
+  Stream<DatabaseEvent> get schedulesStream =>
+      _db?.child('config/schedules').onValue ??
+      const Stream<DatabaseEvent>.empty();
+
+  // --- ACTIONS ---
+  Future<void> togglePump(bool turnOn) async {
+    if (!isConnected) {
+      return;
+    }
+    await _db!.child('control/pump').set(turnOn);
+    if (turnOn) {
+      await _db!.child('control/request_time').set(ServerValue.timestamp);
+    }
+  }
+
+  Future<void> updateScheduleSlot(
+    int index,
+    bool enabled,
+    DateTime localTime,
+    int duration,
+  ) async {
+    if (!isConnected) {
+      return;
+    }
+    DateTime utc = localTime.toUtc();
+    String timeStr =
+        "${utc.hour.toString().padLeft(2, '0')}:${utc.minute.toString().padLeft(2, '0')}";
+    await _db!.child('config/schedules/$index').update({
+      'enabled': enabled,
+      'time_utc': timeStr,
+      'duration_sec': duration,
+    });
+  }
+
+  Future<void> deleteScheduleSlot(int index) async {
+    if (!isConnected) {
+      return;
+    }
+    await _db!.child('config/schedules/$index').set({
+      'enabled': false,
+      'time_utc': "00:00",
+      'duration_sec': 0,
+    });
+  }
+
+  Future<List<dynamic>> getSchedulesOnce() async {
+    if (!isConnected) {
+      return [];
+    }
+    final snapshot = await _db!.child('config/schedules').get();
+    if (snapshot.exists && snapshot.value != null) {
+      if (snapshot.value is List) {
+        return snapshot.value as List;
+      }
+      if (snapshot.value is Map) {
+        Map map = snapshot.value as Map;
+        List<dynamic> list = List.filled(5, null);
+        map.forEach((k, v) {
+          int? idx = int.tryParse(k.toString());
+          if (idx != null && idx < 5) {
+            list[idx] = v;
+          }
+        });
+        return list;
+      }
+    }
+    return [];
+  }
+
+  Stream<OtaEvent> updateApp() {
+    return OtaUpdate().execute(
+      'https://github.com/Pratik4875/SmartGarden_IoT/releases/latest/download/EcoSync.apk',
+      destinationFilename: 'EcoSync.apk',
+    );
+  }
+
+  // --- PROFILE ---
+  Future<void> updateProfileName(String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_name', name);
+    userName = name;
+  }
+
+  Future<void> updateProfilePhoto(String url) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_photo', url);
+    _userPhotoUrl = url;
+  }
+
+  String? get photoUrl => _userPhotoUrl;
+
+  // --- LOGIC ---
   void _startSmartMonitoring() {
-    // 1. Monitor Soil for Alerts
-    _db.child('sensors/soil/percent').onValue.listen((event) {
+    if (!isConnected) {
+      return;
+    }
+
+    _db!.child('sensors/soil/percent').onValue.listen((event) {
       if (event.snapshot.value != null) {
         int moisture = int.tryParse(event.snapshot.value.toString()) ?? 0;
         _checkSoilHealth(moisture);
       }
     });
 
-    // 2. Monitor Pump for Success/Failure
-    _db.child('control/pump').onValue.listen((event) async {
+    _db!.child('control/pump').onValue.listen((event) async {
       bool isPumpOn = (event.snapshot.value == true);
-
       if (isPumpOn) {
-        // Pump JUST started: Record initial moisture
-        final snap = await _db.child('sensors/soil/percent').get();
+        final snap = await _db!.child('sensors/soil/percent').get();
         _startMoisture = int.tryParse(snap.value.toString()) ?? 0;
 
-        // Schedule check in 60 seconds
         _failureCheckTimer?.cancel();
         _failureCheckTimer = Timer(
           const Duration(seconds: 60),
           _checkWateringSuccess,
         );
-        debugPrint("💧 Pump Started. Start Moisture: $_startMoisture%");
       }
     });
   }
 
-  // Logic 1: Soil Health Checks (Dry / Disconnected)
   void _checkSoilHealth(int moisture) {
     final now = DateTime.now();
-
-    // Case A: Sensor Disconnected (0-5%)
     if (moisture <= 5) {
       if (_lastDryAlertTime == null ||
           now.difference(_lastDryAlertTime!).inMinutes > 30) {
         _notifications.showNotification(
           id: 3,
           title: "⚠️ Sensor Error",
-          body: "Moisture is near 0%. Check wiring or sensor placement.",
+          body: "Check wiring.",
         );
-        _lastDryAlertTime = now; // Reuse timer to prevent spam
+        _lastDryAlertTime = now;
       }
       return;
     }
-
-    // Case B: Dry Soil (5-30%)
     if (moisture < _dryThreshold) {
       if (_lastDryAlertTime == null ||
           now.difference(_lastDryAlertTime!).inHours > 6) {
         _notifications.showNotification(
           id: 1,
-          title: "🌱 Plant is Thirsty!",
-          body: "Soil is dry ($moisture%). Time to water.",
+          title: "🌱 Thirsty!",
+          body: "Soil is $moisture%.",
         );
         _lastDryAlertTime = now;
       }
     }
   }
 
-  // Logic 2: Watering Verification
   Future<void> _checkWateringSuccess() async {
-    if (_startMoisture == null) return;
-
-    final snap = await _db.child('sensors/soil/percent').get();
+    if (_startMoisture == null) {
+      return;
+    }
+    final snap = await _db!.child('sensors/soil/percent').get();
     int endMoisture = int.tryParse(snap.value.toString()) ?? 0;
-    int difference = endMoisture - _startMoisture!;
 
-    // Case A: Already Wet (Success)
-    if (endMoisture >= 95) {
-      debugPrint("✅ Watering Success: Soil is fully saturated ($endMoisture%)");
-      _startMoisture = null;
-      return;
-    }
-
-    // Case B: Significant Increase (Success)
-    if (difference >= 3) {
-      debugPrint("✅ Watering Success: Moisture rose by $difference%");
-      _startMoisture = null;
-      return;
-    }
-
-    // Case C: No Increase (Failure)
-    // Only alert if we started below 90%
-    if (_startMoisture! < 90) {
+    if (endMoisture < 95 &&
+        (endMoisture - _startMoisture!) < 3 &&
+        _startMoisture! < 90) {
       _notifications.showNotification(
         id: 2,
         title: "⚠️ Watering Failed",
-        body: "Pump ran, but soil didn't get wetter. Empty tank?",
+        body: "Check pump/tank.",
       );
-      debugPrint("❌ Failure: Start $_startMoisture -> End $endMoisture");
     }
-
     _startMoisture = null;
   }
 
-  // --- STREAMS ---
-  Stream<DatabaseEvent> get pumpStatusStream =>
-      _db.child('control/pump').onValue;
-  Stream<DatabaseEvent> get tempStream => _db.child('sensors/dht/temp').onValue;
-  Stream<DatabaseEvent> get humidityStream =>
-      _db.child('sensors/dht/humidity').onValue;
-  Stream<DatabaseEvent> get soilStream =>
-      _db.child('sensors/soil/percent').onValue;
-  Stream<DatabaseEvent> get lastWateredStream =>
-      _db.child('status/last_watered').onValue;
-
-  Stream<DatabaseEvent> get scheduleEnabledStream =>
-      _db.child('config/scheduler/enabled').onValue;
-  Stream<DatabaseEvent> get scheduleTimeStream =>
-      _db.child('config/scheduler/time_utc').onValue;
-  Stream<DatabaseEvent> get scheduleDurationStream =>
-      _db.child('config/scheduler/duration_sec').onValue;
-  Stream<DatabaseEvent> get deviceLastSeenStream =>
-      _db.child('device/ts').onValue;
-
-  // --- ACTIONS ---
-  Future<void> togglePump(bool turnOn) async {
-    await _db.child('control/pump').set(turnOn);
-    if (turnOn) {
-      await _db.child('control/request_time').set(ServerValue.timestamp);
-    }
-  }
-
-  Future<void> setSchedule(
-    bool enabled,
-    DateTime? localTime,
-    int? duration,
-  ) async {
-    Map<String, Object> updates = {};
-    updates['config/scheduler/enabled'] = enabled;
-
-    if (duration != null) {
-      updates['config/scheduler/duration_sec'] = duration;
-    }
-
-    if (localTime != null) {
-      DateTime utcTime = localTime.toUtc();
-      String hour = utcTime.hour.toString().padLeft(2, '0');
-      String minute = utcTime.minute.toString().padLeft(2, '0');
-      updates['config/scheduler/time_utc'] = "$hour:$minute";
-    }
-
-    await _db.update(updates);
-  }
-
-  Stream<OtaEvent> updateApp() {
-    try {
-      return OtaUpdate().execute(
-        'https://github.com/Pratik4875/SmartGarden_IoT/releases/latest/download/EcoSync.apk',
-        destinationFilename: 'EcoSync.apk',
-      );
-    } catch (e) {
-      debugPrint('Failed to make OTA update. Details: $e');
-      rethrow;
-    }
-  }
-
-  // --- HISTORY & INSIGHTS ---
+  // --- HISTORY ---
   Future<List<List<FlSpot>>> getHistoryData() async {
-    final snapshot = await _db.child('history').get();
+    if (!isConnected) {
+      return [[], []];
+    }
+    final snapshot = await _db!.child('history').get();
     List<FlSpot> tempSpots = [];
     List<FlSpot> soilSpots = [];
 
     if (snapshot.exists && snapshot.value != null) {
       try {
-        List<Map<dynamic, dynamic>> safeEntries = [];
-
-        if (snapshot.value is List) {
-          var list = snapshot.value as List;
-          for (var item in list) {
-            if (item != null) {
-              safeEntries.add(item as Map);
-            }
-          }
-        } else if (snapshot.value is Map) {
-          var map = snapshot.value as Map;
-          map.forEach((key, value) {
-            safeEntries.add(value as Map);
-          });
+        List<dynamic> rawValues = [];
+        if (snapshot.value is Map) {
+          rawValues = (snapshot.value as Map).values.toList();
+        } else if (snapshot.value is List) {
+          rawValues = snapshot.value as List;
         }
 
-        safeEntries.sort((a, b) => (a['ts'] ?? 0).compareTo(b['ts'] ?? 0));
+        List<Map> cleanEntries = [];
+        for (var item in rawValues) {
+          if (item != null && item is Map) {
+            cleanEntries.add(item);
+          }
+        }
 
-        if (safeEntries.length > 24) {
-          safeEntries = safeEntries.sublist(safeEntries.length - 24);
+        cleanEntries.sort((a, b) {
+          int tsA = int.tryParse(a['ts'].toString()) ?? 0;
+          int tsB = int.tryParse(b['ts'].toString()) ?? 0;
+          return tsA.compareTo(tsB);
+        });
+
+        if (cleanEntries.length > 24) {
+          cleanEntries = cleanEntries.sublist(cleanEntries.length - 24);
         }
 
         int index = 0;
-        for (var data in safeEntries) {
-          double t = (data['t'] as num? ?? 0).toDouble();
-          double s = (data['s'] as num? ?? 0).toDouble();
-
+        for (var data in cleanEntries) {
+          double t = double.tryParse(data['t'].toString()) ?? 0;
+          double s = double.tryParse(data['s'].toString()) ?? 0;
           tempSpots.add(FlSpot(index.toDouble(), t));
           soilSpots.add(FlSpot(index.toDouble(), s));
           index++;
         }
       } catch (e) {
-        debugPrint("Error parsing history: $e");
+        debugPrint("History Error: $e");
       }
     }
     return [tempSpots, soilSpots];
   }
 
+  // --- INSIGHTS ---
   Future<Map<String, double>> getDailyInsights() async {
-    final snapshot = await _db.child('history').get();
-
-    double minTemp = 100.0;
-    double maxTemp = 0.0;
-    double minSoil = 100.0;
-    double maxSoil = 0.0;
-
-    if (!snapshot.exists || snapshot.value == null) {
+    if (!isConnected) {
       return {'minTemp': 0, 'maxTemp': 0, 'minSoil': 0, 'maxSoil': 0};
     }
 
-    try {
-      Map<dynamic, dynamic> values = snapshot.value as Map<dynamic, dynamic>;
+    final snapshot = await _db!.child('history').get();
 
-      int nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-      int oneDayAgo = nowSec - 86400;
+    if (snapshot.exists && snapshot.value != null) {
+      try {
+        List<dynamic> rawValues = [];
+        if (snapshot.value is Map) {
+          rawValues = (snapshot.value as Map).values.toList();
+        } else if (snapshot.value is List) {
+          rawValues = snapshot.value as List;
+        }
 
-      for (var entry in values.values) {
-        int ts = (entry['ts'] as num).toInt();
-        if (ts > oneDayAgo) {
-          double t = (entry['t'] as num).toDouble();
-          double s = (entry['s'] as num).toDouble();
+        int now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+        int oneDayAgo = now - 86400; // 24 hours ago
 
-          if (t < minTemp) {
-            minTemp = t;
+        List<double> temps = [];
+        List<double> soils = [];
+
+        for (var item in rawValues) {
+          if (item == null || item is! Map) {
+            continue;
           }
-          if (t > maxTemp) {
-            maxTemp = t;
-          }
-          if (s < minSoil) {
-            minSoil = s;
-          }
-          if (s > maxSoil) {
-            maxSoil = s;
+
+          int ts = int.tryParse(item['ts'].toString()) ?? 0;
+
+          if (ts > oneDayAgo) {
+            double t = double.tryParse(item['t'].toString()) ?? 0;
+            double s = double.tryParse(item['s'].toString()) ?? 0;
+            if (t > 0) {
+              temps.add(t);
+            }
+            if (s > 0) {
+              soils.add(s);
+            }
           }
         }
-      }
 
-      if (minTemp == 100.0) {
-        minTemp = 0.0;
+        if (temps.isEmpty) {
+          return {'minTemp': 0, 'maxTemp': 0, 'minSoil': 0, 'maxSoil': 0};
+        }
+
+        return {
+          'minTemp': temps.reduce(min),
+          'maxTemp': temps.reduce(max),
+          'minSoil': soils.reduce(min),
+          'maxSoil': soils.reduce(max),
+        };
+      } catch (e) {
+        debugPrint("Insights Calculation Error: $e");
       }
-    } catch (e) {
-      debugPrint("Error calculating insights: $e");
     }
-
-    return {
-      'minTemp': minTemp,
-      'maxTemp': maxTemp,
-      'minSoil': minSoil,
-      'maxSoil': maxSoil,
-    };
+    return {'minTemp': 0, 'maxTemp': 0, 'minSoil': 0, 'maxSoil': 0};
   }
 }

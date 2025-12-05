@@ -1,128 +1,130 @@
-import 'dart:async'; // Required for Timer
 import 'package:flutter/material.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../services/iot_service.dart';
+import 'package:firebase_database/firebase_database.dart';
 
-class StatusHeader extends StatefulWidget {
+class StatusHeader extends StatelessWidget {
   final IoTService iotService;
 
   const StatusHeader({super.key, required this.iotService});
 
-  @override
-  State<StatusHeader> createState() => _StatusHeaderState();
-}
+  String _formatTimestamp(int timestamp) {
+    // FIX: Filter out 0 or "epoch 0" timestamps
+    if (timestamp < 1600000000) return "Never";
 
-class _StatusHeaderState extends State<StatusHeader> {
-  Timer? _refreshTimer;
+    final dt = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
+    final now = DateTime.now();
+    final diff = now.difference(dt);
 
-  @override
-  void initState() {
-    super.initState();
-    // Force UI to rebuild every 5 seconds to update "Offline" status
-    // even if no new data comes from the ESP.
-    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (mounted) setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _refreshTimer?.cancel();
-    super.dispose();
+    if (diff.inMinutes < 1) return "Just now";
+    if (diff.inMinutes < 60) return "${diff.inMinutes}m ago";
+    if (diff.inHours < 24) return "${diff.inHours}h ago";
+    return DateFormat('MMM d, h:mm a').format(dt);
   }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<DatabaseEvent>(
-      stream: widget.iotService.lastWateredStream,
-      builder: (context, snapshot) {
-        String timeText = "Never";
-        if (snapshot.hasData && snapshot.data!.snapshot.value != null) {
-          int timestamp =
-              int.tryParse(snapshot.data!.snapshot.value.toString()) ?? 0;
-          if (timestamp > 0) {
-            DateTime date = DateTime.fromMillisecondsSinceEpoch(
-              timestamp * 1000,
-            );
-            timeText = DateFormat('MMM d, h:mm a').format(date);
-          }
-        }
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Last Watered",
-                  style: GoogleFonts.poppins(color: Colors.grey),
+    return Column(
+      children: [
+        StreamBuilder<bool>(
+          stream: iotService.onlineStatusStream,
+          initialData: false,
+          builder: (context, onlineSnap) {
+            final bool isOnline = onlineSnap.data ?? false;
+
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+              decoration: BoxDecoration(
+                color: isOnline
+                    ? Colors.greenAccent.withValues(alpha: 0.1)
+                    : Colors.redAccent.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(
+                  color: isOnline
+                      ? Colors.greenAccent.withValues(alpha: 0.3)
+                      : Colors.redAccent.withValues(alpha: 0.3),
                 ),
-                Text(
-                  timeText,
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w600,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        isOnline ? Icons.wifi : Icons.wifi_off,
+                        color: isOnline ? Colors.greenAccent : Colors.redAccent,
+                      ),
+                      const SizedBox(width: 10),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isOnline ? "System Online" : "System Offline",
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Text(
+                            isOnline
+                                ? "Connected to Hub"
+                                : "Last seen > 2 min ago",
+                            style: GoogleFonts.poppins(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
-            _buildOnlineStatus(),
-          ],
-        );
-      },
-    );
-  }
 
-  Widget _buildOnlineStatus() {
-    return StreamBuilder<DatabaseEvent>(
-      stream: widget.iotService.deviceLastSeenStream,
-      builder: (context, snapshot) {
-        bool isOnline = false;
-        if (snapshot.hasData && snapshot.data!.snapshot.value != null) {
-          int lastSeenTs =
-              int.tryParse(snapshot.data!.snapshot.value.toString()) ?? 0;
+                  // LAST RUN DISPLAY
+                  StreamBuilder<DatabaseEvent>(
+                    stream: iotService.lastWateredStream,
+                    builder: (context, waterSnap) {
+                      String lastRun = "Never";
+                      if (waterSnap.hasData &&
+                          waterSnap.data!.snapshot.value != null) {
+                        final val = waterSnap.data!.snapshot.value;
+                        if (val is int) {
+                          lastRun = _formatTimestamp(val);
+                        } else if (val is String) {
+                          lastRun = _formatTimestamp(int.tryParse(val) ?? 0);
+                        }
+                      }
 
-          // Compare UTC to UTC
-          int now = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
-
-          // If update was less than 120s ago, we are online
-          if ((now - lastSeenTs).abs() < 120) {
-            isOnline = true;
-          }
-        }
-
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: (isOnline ? Colors.green : Colors.red).withValues(
-              alpha: 0.2,
-            ),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: isOnline ? Colors.green : Colors.red),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.circle,
-                size: 10,
-                color: isOnline ? Colors.green : Colors.red,
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            "LAST RUN",
+                            style: GoogleFonts.poppins(
+                              color: Colors.white38,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            lastRun,
+                            style: GoogleFonts.poppins(
+                              color: Colors.cyanAccent,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
               ),
-              const SizedBox(width: 6),
-              Text(
-                isOnline ? "ONLINE" : "OFFLINE",
-                style: GoogleFonts.poppins(
-                  color: isOnline ? Colors.green : Colors.red,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+            );
+          },
+        ),
+      ],
     );
   }
 }

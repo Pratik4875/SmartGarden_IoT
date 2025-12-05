@@ -1,87 +1,80 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'firebase_options.dart';
-// Ensure this path is correct and the file contains class 'SplashScreen'
-import 'screens/splash_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/services.dart';
+
+import 'screens/splash_screen.dart'; // Import Splash
 import 'screens/login_screen.dart';
-import 'screens/dashboard.dart';
+import 'screens/home_screen.dart';
+import 'widgets/custom_loading_animation.dart';
 
-Future<void> main() async {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
 
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } catch (e, st) {
-    // Print a useful message for tests/CI; don't rethrow so tests can handle startup gracefully.
-    // Remove or change this in production if you want to fail fast.
-    debugPrint('Firebase initialization error: $e\n$st');
-  }
+  // Lock Orientation
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
 
-  runApp(const MyApp());
+  runApp(const EcoSyncApp());
 }
 
-class MyApp extends StatefulWidget {
-  const MyApp({super.key});
-
-  @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  late Future<String?> _savedUrlFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _savedUrlFuture = _getSavedUrl();
-  }
-
-  Future<String?> _getSavedUrl() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('firebase_url');
-  }
+class EcoSyncApp extends StatelessWidget {
+  const EcoSyncApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'EcoSync',
+      title: 'EcoSync IoT',
       debugShowCheckedModeBanner: false,
+
+      // Global Dark Theme
       theme: ThemeData(
         brightness: Brightness.dark,
-        primarySwatch: Colors.green,
-        scaffoldBackgroundColor: const Color(0xFF121212),
+        scaffoldBackgroundColor: const Color(0xFF1E1E1E),
+        primaryColor: Colors.cyanAccent,
         useMaterial3: true,
+        textTheme: GoogleFonts.poppinsTextTheme(
+          Theme.of(context).textTheme.apply(bodyColor: Colors.white),
+        ),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.cyanAccent,
+          brightness: Brightness.dark,
+        ),
       ),
-      home: FutureBuilder<String?>(
-        future: _savedUrlFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
-              backgroundColor: Color(0xFF0F0F10),
-              body: Center(
-                child: CircularProgressIndicator(color: Colors.cyan),
-              ),
-            );
-          }
 
-          final savedUrl = snapshot.data;
+      // FIX: Start with Splash Screen
+      home: const SplashScreen(),
 
-          // Calling the SplashScreen constructor we fixed previously
-          return SplashScreen(
-            splashDuration: const Duration(seconds: 4),
-            nextScreenBuilder: (context) {
-              if (savedUrl != null && savedUrl.isNotEmpty) {
-                return DashboardScreen(databaseUrl: savedUrl);
-              } else {
-                return const LoginScreen();
-              }
-            },
-          );
-        },
-      ),
+      // Define a route for the Auth Wrapper
+      routes: {'/auth': (context) => const AuthWrapper()},
+    );
+  }
+}
+
+// --- AUTH WRAPPER ---
+// Handles the Login vs Home logic
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: CustomLoadingAnimation(size: 60));
+        }
+
+        if (snapshot.hasData) {
+          return const HomeScreen(); // User is logged in
+        }
+
+        return const LoginScreen(); // User needs to login
+      },
     );
   }
 }

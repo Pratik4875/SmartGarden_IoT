@@ -1,94 +1,72 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'dart:async';
-import '../widgets/custom_loading_animation.dart'; // Import new loader
+import '../widgets/custom_loading_animation.dart';
 
 class SplashScreen extends StatefulWidget {
-  final Duration splashDuration;
-  final WidgetBuilder nextScreenBuilder;
-
-  const SplashScreen({
-    super.key,
-    required this.nextScreenBuilder,
-    this.splashDuration = const Duration(seconds: 3),
-  });
+  const SplashScreen({super.key});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  Timer? _timer;
-
   @override
   void initState() {
     super.initState();
-    _timer = Timer(widget.splashDuration, _navigate);
-  }
-
-  void _navigate() {
-    if (!mounted) return;
-    Navigator.of(
-      context,
-    ).pushReplacement(MaterialPageRoute(builder: widget.nextScreenBuilder));
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
+    // Start a 3-second timer, then navigate to Auth Check
+    Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        // Use replacement so user can't go back to Splash
+        Navigator.of(context).pushReplacementNamed('/auth');
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F10),
-      body: SafeArea(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Spacer(flex: 2),
+      backgroundColor: const Color(0xFF0F2027), // Deep dark background
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Logo Animation (Zoom In effect could be added here later)
+            SizedBox(
+              width: 150,
+              height: 150,
+              child: SvgPicture.asset('assets/logo.svg'),
+            ),
+            const SizedBox(height: 30),
 
-              // 1. LOGO
-              SizedBox(
-                width: 150,
-                height: 150,
-                child: SvgPicture.asset('assets/logo.svg'),
+            // App Name
+            Text(
+              "ECOSYNC",
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontSize: 40,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 4.0,
               ),
+            ),
 
-              const SizedBox(height: 40),
-
-              // 2. BRANDING TEXT
-              Text(
-                'ECOSYNC',
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 4.0,
-                ),
+            // Slogan
+            Text(
+              "Smart Garden Automation",
+              style: GoogleFonts.poppins(
+                color: Colors.cyanAccent,
+                fontSize: 14,
+                fontWeight: FontWeight.w300,
+                letterSpacing: 1.2,
               ),
-              Text(
-                'Smart Automation Hub',
-                style: GoogleFonts.poppins(
-                  color: Colors.cyanAccent,
-                  fontSize: 14,
-                  letterSpacing: 1.5,
-                ),
-              ),
+            ),
 
-              const Spacer(flex: 1),
+            const SizedBox(height: 60),
 
-              // 3. NEW WAVE ANIMATION
-              const CustomLoadingAnimation(
-                size: 50,
-              ), // 50 looks cleaner than 200 for a footer
-
-              const Spacer(flex: 2),
-            ],
-          ),
+            // Loading Indicator
+            const CustomLoadingAnimation(size: 50),
+          ],
         ),
       ),
     );

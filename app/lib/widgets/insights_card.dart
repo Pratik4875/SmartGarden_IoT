@@ -13,9 +13,13 @@ class InsightsCard extends StatelessWidget {
       future: iotService.getDailyInsights(),
       builder: (context, snapshot) {
         double minT = 0, maxT = 0;
+        bool hasData = false;
+
         if (snapshot.hasData) {
           minT = snapshot.data!['minTemp'] ?? 0;
           maxT = snapshot.data!['maxTemp'] ?? 0;
+          // If Max Temp is > 0, we assume we found valid data
+          if (maxT > 0) hasData = true;
         }
 
         return Container(
@@ -55,14 +59,14 @@ class InsightsCard extends StatelessWidget {
                 children: [
                   _buildStatColumn(
                     "Night Low",
-                    "${minT.toStringAsFixed(1)}°C",
+                    hasData ? "${minT.toStringAsFixed(1)}°C" : "--",
                     Icons.bedtime,
                     Colors.blue,
                   ),
                   Container(width: 1, height: 40, color: Colors.white10),
                   _buildStatColumn(
                     "Day Peak",
-                    "${maxT.toStringAsFixed(1)}°C",
+                    hasData ? "${maxT.toStringAsFixed(1)}°C" : "--",
                     Icons.wb_sunny,
                     Colors.orange,
                   ),
