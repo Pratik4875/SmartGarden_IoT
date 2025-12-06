@@ -145,7 +145,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 if (mounted) setState(() {});
               }
 
-              // FIX — DO NOT create ctx, use dialogCtx directly
+              // FIX: Use dialogCtx instead of context to avoid async gap warning
               Navigator.pop(dialogCtx);
             },
             child: const Text(
@@ -173,7 +173,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    // FIX: Capture BuildContext before async gap
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
+    scaffoldMessenger.showSnackBar(
       const SnackBar(content: Text("Garden Linked! Restarting...")),
     );
 
@@ -181,7 +185,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (!mounted) return;
 
-    Navigator.of(context).pushAndRemoveUntil(
+    navigator.pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const HomeScreen()),
       (route) => false,
     );
@@ -278,17 +282,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.save, color: Colors.cyanAccent),
                   onPressed: () async {
-                    final ctx = context; // FIX — must come before await
-
                     await widget.iotService.updateProfileName(
                       _nameController.text,
                     );
 
                     if (!mounted) return;
 
-                    ScaffoldMessenger.of(
-                      ctx,
-                    ).showSnackBar(const SnackBar(content: Text("Name Saved")));
+                    // FIX: Capture ScaffoldMessenger before async gap
+                    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+                    scaffoldMessenger.showSnackBar(
+                      const SnackBar(content: Text("Name Saved")),
+                    );
 
                     setState(() {});
                   },
@@ -406,13 +411,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 onPressed: () async {
-                  final ctx = context; // FIX — must come before await
-
                   await widget.iotService.signOut();
 
                   if (!mounted) return;
 
-                  Navigator.of(ctx).pushAndRemoveUntil(
+                  // FIX: Capture Navigator before async gap
+                  final navigator = Navigator.of(context);
+
+                  navigator.pushAndRemoveUntil(
                     MaterialPageRoute(builder: (_) => const LoginScreen()),
                     (route) => false,
                   );

@@ -10,11 +10,55 @@ import '../widgets/schedule_list.dart';
 import '../widgets/pump_control.dart';
 import '../widgets/insights_card.dart';
 import '../widgets/custom_loading_animation.dart';
+import '../widgets/garden_refresh_indicator.dart'; // NEW IMPORT
 
-class SmartGardenScreen extends StatelessWidget {
+class SmartGardenScreen extends StatefulWidget {
   final IoTService iotService;
 
   const SmartGardenScreen({super.key, required this.iotService});
+
+  @override
+  State<SmartGardenScreen> createState() => _SmartGardenScreenState();
+}
+
+class _SmartGardenScreenState extends State<SmartGardenScreen> {
+  // Future that controls the initial load and manual refresh state
+  late Future<void> _refreshFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize the future by waiting for the service to be ready and then forcing a refresh
+    _refreshFuture = widget.iotService.ready.then(
+      (_) => _refreshData(silent: true),
+    );
+  }
+
+  Future<void> _refreshData({bool silent = false}) async {
+    // 1. Force fetch data from Firebase (Updates local cache)
+    final statusMsg = await widget.iotService.forceStatusRefresh();
+
+    // 2. Trigger UI Rebuild to show the new cached data
+    if (mounted) {
+      setState(() {
+        // This setState is critical to update widgets reading from Streams
+        // that might have received new values during the forceRefresh
+      });
+
+      if (!silent) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(statusMsg),
+            backgroundColor: statusMsg.contains("Online")
+                ? Colors.green
+                : Colors.orange,
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +73,7 @@ class SmartGardenScreen extends StatelessWidget {
             color: Colors.white,
           ),
         ),
-        backgroundColor: Colors.transparent,
+        backgroundColor: const Color(0xFF1E1E1E),
         elevation: 0,
         actions: [
           // Graph / History Button
@@ -38,34 +82,40 @@ class SmartGardenScreen extends StatelessWidget {
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => HistoryScreen(iotService: iotService),
+                builder: (_) => HistoryScreen(iotService: widget.iotService),
               ),
             ),
           ),
         ],
       ),
-      // Wait for Auth/Connection before showing data to prevent "Permission Denied"
+      // Use _refreshFuture to manage the global loading state
       body: FutureBuilder(
-        future: iotService.ready,
+        future: _refreshFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CustomLoadingAnimation(size: 50));
           }
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                StatusHeader(iotService: iotService),
-                const SizedBox(height: 30),
-                InsightsCard(iotService: iotService),
-                const SizedBox(height: 30),
-                SensorGrid(iotService: iotService),
-                const SizedBox(height: 30),
-                ScheduleList(iotService: iotService),
-                const SizedBox(height: 30),
-                PumpControl(iotService: iotService),
-              ],
+          // NEW: Use the Custom GardenRefreshIndicator
+          return GardenRefreshIndicator(
+            onRefresh: _refreshData,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  StatusHeader(iotService: widget.iotService),
+                  const SizedBox(height: 30),
+                  InsightsCard(iotService: widget.iotService),
+                  const SizedBox(height: 30),
+                  SensorGrid(iotService: widget.iotService),
+                  const SizedBox(height: 30),
+                  ScheduleList(iotService: widget.iotService),
+                  const SizedBox(height: 30),
+                  PumpControl(iotService: widget.iotService),
+                  const SizedBox(height: 50),
+                ],
+              ),
             ),
           );
         },

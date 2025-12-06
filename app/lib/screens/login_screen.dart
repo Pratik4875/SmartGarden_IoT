@@ -4,7 +4,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:slide_to_act/slide_to_act.dart';
 import 'home_screen.dart';
 import '../services/iot_service.dart';
-import '../widgets/custom_loading_animation.dart'; // Import
+import '../widgets/custom_loading_animation.dart';
+import '../widgets/google_button.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -15,18 +16,15 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _isRegistering = false;
-
   final _emailController = TextEditingController();
   final _passController = TextEditingController();
   final _nameController = TextEditingController();
   final GlobalKey<SlideActionState> _slideKey = GlobalKey();
-
   bool _isLoading = false;
   final IoTService _iotService = IoTService();
 
   Future<void> _handleEmailAuth() async {
     setState(() => _isLoading = true);
-
     try {
       if (_isRegistering) {
         if (_nameController.text.isEmpty) throw "Name is required";
@@ -41,7 +39,6 @@ class _LoginScreenState extends State<LoginScreen> {
           _passController.text.trim(),
         );
       }
-
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const HomeScreen()),
@@ -66,6 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleGoogleLogin() async {
     setState(() => _isLoading = true);
     final credential = await IoTService.signInWithGoogle();
+
     if (credential != null && mounted) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const HomeScreen()),
@@ -105,7 +103,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: GoogleFonts.poppins(color: Colors.white54, fontSize: 14),
               ),
               const SizedBox(height: 40),
-
               if (_isRegistering) ...[
                 _buildTextField(_nameController, "Full Name", Icons.person),
                 const SizedBox(height: 15),
@@ -118,10 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Icons.lock,
                 isObscure: true,
               ),
-
               const SizedBox(height: 40),
-
-              // REPLACED: CircularProgressIndicator -> CustomLoadingAnimation
               if (_isLoading)
                 const CustomLoadingAnimation(size: 50)
               else
@@ -150,9 +144,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   onSubmit: _handleEmailAuth,
                 ),
-
               const SizedBox(height: 20),
-
               TextButton(
                 onPressed: () => setState(() {
                   _isRegistering = !_isRegistering;
@@ -165,32 +157,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: GoogleFonts.poppins(color: Colors.white70),
                 ),
               ),
-
               const Divider(color: Colors.white10, height: 40),
 
-              if (!_isLoading)
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.white24),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    icon: const Icon(
-                      Icons.g_mobiledata,
-                      size: 32,
-                      color: Colors.white,
-                    ),
-                    label: Text(
-                      "Google Sign In",
-                      style: GoogleFonts.poppins(color: Colors.white),
-                    ),
-                    onPressed: _handleGoogleLogin,
-                  ),
-                ),
+              // NEW ANIMATED BUTTON INTEGRATION
+              GoogleButton(
+                isLoading: _isLoading,
+                onPressed: _handleGoogleLogin,
+              ),
             ],
           ),
         ),

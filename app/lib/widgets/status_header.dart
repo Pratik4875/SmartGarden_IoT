@@ -10,16 +10,33 @@ class StatusHeader extends StatelessWidget {
   const StatusHeader({super.key, required this.iotService});
 
   String _formatTimestamp(int timestamp) {
-    // FIX: Filter out 0 or "epoch 0" timestamps
-    if (timestamp < 1600000000) return "Never";
+    if (timestamp <= 0) return "Never";
 
-    final dt = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
+    // Auto-detect Milliseconds vs Seconds
+    // 1600000000 is approx Year 2020 in seconds.
+    // If it's larger than 100 billion, it's definitely milliseconds.
+    int timeInMs = timestamp;
+    if (timestamp < 100000000000) {
+      timeInMs = timestamp * 1000;
+    }
+
+    final dt = DateTime.fromMillisecondsSinceEpoch(timeInMs);
     final now = DateTime.now();
+
+    // Check if the date is absurdly far in the future (e.g. wrong scaling)
+    if (dt.year > now.year + 1) return "Invalid Date";
+
     final diff = now.difference(dt);
 
-    if (diff.inMinutes < 1) return "Just now";
-    if (diff.inMinutes < 60) return "${diff.inMinutes}m ago";
-    if (diff.inHours < 24) return "${diff.inHours}h ago";
+    if (diff.inMinutes < 1) {
+      return "Just now";
+    }
+    if (diff.inMinutes < 60) {
+      return "${diff.inMinutes}m ago";
+    }
+    if (diff.inHours < 24) {
+      return "${diff.inHours}h ago";
+    }
     return DateFormat('MMM d, h:mm a').format(dt);
   }
 
@@ -81,41 +98,69 @@ class StatusHeader extends StatelessWidget {
                     ],
                   ),
 
-                  // LAST RUN DISPLAY
+                  // LAST RUN DISPLAY (With Fallback Logic)
                   StreamBuilder<DatabaseEvent>(
                     stream: iotService.lastWateredStream,
                     builder: (context, waterSnap) {
-                      String lastRun = "Never";
+                      // 1. Try fetching official "Last Watered" time (from ESP)
+                      int? waterTs;
                       if (waterSnap.hasData &&
                           waterSnap.data!.snapshot.value != null) {
                         final val = waterSnap.data!.snapshot.value;
-                        if (val is int) {
-                          lastRun = _formatTimestamp(val);
-                        } else if (val is String) {
-                          lastRun = _formatTimestamp(int.tryParse(val) ?? 0);
-                        }
+                        if (val is int)
+                          waterTs = val;
+                        else if (val is String)
+                          waterTs = int.tryParse(val);
                       }
 
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            "LAST RUN",
-                            style: GoogleFonts.poppins(
-                              color: Colors.white38,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            lastRun,
-                            style: GoogleFonts.poppins(
-                              color: Colors.cyanAccent,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
+                      // 2. Fetch "Last Requested" time (from App) as fallback
+                      return StreamBuilder<DatabaseEvent>(
+                        stream: iotService.requestTimeStream,
+                        builder: (context, reqSnap) {
+                          int? reqTs;
+                          if (reqSnap.hasData &&
+                              reqSnap.data!.snapshot.value != null) {
+                            final val = reqSnap.data!.snapshot.value;
+                            if (val is int)
+                              reqTs = val;
+                            else if (val is String)
+                              reqTs = int.tryParse(val);
+                          }
+
+                          // LOGIC: Prefer 'Watered' time if it looks valid (> 2020).
+                          // Otherwise, use 'Requested' time if valid.
+                          String timeText = "Never";
+
+                          // 1600000000 is ~Year 2020 in seconds
+                          if (waterTs != null && waterTs > 1600000000) {
+                            timeText = _formatTimestamp(waterTs);
+                          } else if (reqTs != null && reqTs > 1600000000) {
+                            // If falling back to request time, append "(Req)" so user knows it's an estimate
+                            timeText = "${_formatTimestamp(reqTs)} (Req)";
+                          }
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                "LAST RUN",
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white38,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                timeText,
+                                style: GoogleFonts.poppins(
+                                  color: Colors.cyanAccent,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       );
                     },
                   ),

@@ -1,3 +1,15 @@
+// 1. ADD THIS BLOCK AT THE VERY TOP
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        // This is required to parse google-services.json
+        classpath("com.google.gms:google-services:4.4.2")
+    }
+}
+
 allprojects {
     repositories {
         google()

@@ -90,7 +90,8 @@ class NotificationService {
             color: Color(0xFF00E676),
           ),
         ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        // FIX: Use 'inexact' to avoid crashing on Android 12+ without special permissions
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         matchDateTimeComponents: DateTimeComponents.time,
       );
       debugPrint("✅ Daily Report Scheduled for 7:30 PM");

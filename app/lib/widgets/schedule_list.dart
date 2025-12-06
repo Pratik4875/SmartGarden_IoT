@@ -10,83 +10,112 @@ class ScheduleList extends StatelessWidget {
 
   const ScheduleList({super.key, required this.iotService});
 
+  void _showOfflineMessage(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Device is offline. Cannot manage schedules."),
+        backgroundColor: Colors.redAccent,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF2C2C2C),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return StreamBuilder<bool>(
+      stream: iotService.onlineStatusStream,
+      initialData: false,
+      builder: (context, onlineSnap) {
+        final bool isOnline = onlineSnap.data ?? false;
+
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2C2C2C),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white10),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Icon(
-                    Icons.access_time_filled,
-                    color: Colors.cyanAccent,
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.access_time_filled,
+                        color: isOnline
+                            ? Colors.cyanAccent
+                            : Colors.grey, // Visual indicator
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        "Schedules (Max 5)",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 10),
-                  Text(
-                    "Schedules (Max 5)",
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                  IconButton(
+                    icon: Icon(
+                      Icons.add_circle,
+                      color: isOnline
+                          ? Colors.cyanAccent
+                          : Colors.grey.shade600, // Visual indicator
+                      size: 28,
                     ),
+                    // Block the onPressed if offline
+                    onPressed: isOnline
+                        ? () => _handleAddNew(context)
+                        : () => _showOfflineMessage(context),
                   ),
                 ],
               ),
-              IconButton(
-                icon: const Icon(
-                  Icons.add_circle,
-                  color: Colors.cyanAccent,
-                  size: 28,
-                ),
-                onPressed: () => _handleAddNew(context),
+              const SizedBox(height: 15),
+
+              StreamBuilder<DatabaseEvent>(
+                stream: iotService.schedulesStream,
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData ||
+                      snapshot.data!.snapshot.value == null) {
+                    return _buildEmptyState();
+                  }
+
+                  List<dynamic> rawList = [];
+                  final value = snapshot.data!.snapshot.value;
+
+                  if (value is List) {
+                    rawList = value;
+                  } else if (value is Map) {
+                    var sortedKeys = value.keys.toList()..sort();
+                    for (var key in sortedKeys) {
+                      rawList.add(value[key]);
+                    }
+                  }
+
+                  List<Widget> activeWidgets = [];
+                  for (int i = 0; i < rawList.length; i++) {
+                    var item = rawList[i];
+                    if (item != null &&
+                        item is Map &&
+                        item['enabled'] == true) {
+                      activeWidgets.add(
+                        _buildScheduleItem(context, i, item, isOnline),
+                      ); // Pass online status
+                    }
+                  }
+
+                  if (activeWidgets.isEmpty) return _buildEmptyState();
+                  return Column(children: activeWidgets);
+                },
               ),
             ],
           ),
-          const SizedBox(height: 15),
-
-          StreamBuilder<DatabaseEvent>(
-            stream: iotService.schedulesStream,
-            builder: (context, snapshot) {
-              if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
-                return _buildEmptyState();
-              }
-
-              List<dynamic> rawList = [];
-              final value = snapshot.data!.snapshot.value;
-
-              if (value is List) {
-                rawList = value;
-              } else if (value is Map) {
-                var sortedKeys = value.keys.toList()..sort();
-                for (var key in sortedKeys) {
-                  rawList.add(value[key]);
-                }
-              }
-
-              List<Widget> activeWidgets = [];
-              for (int i = 0; i < rawList.length; i++) {
-                var item = rawList[i];
-                if (item != null && item is Map && item['enabled'] == true) {
-                  activeWidgets.add(_buildScheduleItem(context, i, item));
-                }
-              }
-
-              if (activeWidgets.isEmpty) return _buildEmptyState();
-              return Column(children: activeWidgets);
-            },
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -103,7 +132,12 @@ class ScheduleList extends StatelessWidget {
     );
   }
 
-  Widget _buildScheduleItem(BuildContext context, int index, Map item) {
+  Widget _buildScheduleItem(
+    BuildContext context,
+    int index,
+    Map item,
+    bool isOnline,
+  ) {
     String utcTime = item['time_utc'] ?? "00:00";
     int duration = item['duration_sec'] ?? 15;
 
@@ -117,6 +151,8 @@ class ScheduleList extends StatelessWidget {
     } catch (e) {
       /* Fallback */
     }
+
+    final bool canDelete = isOnline;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -150,8 +186,16 @@ class ScheduleList extends StatelessWidget {
             ],
           ),
           IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-            onPressed: () => iotService.deleteScheduleSlot(index),
+            icon: Icon(
+              Icons.delete_outline,
+              color: canDelete
+                  ? Colors.redAccent
+                  : Colors.grey.shade800, // Grey out if offline
+            ),
+            // Block deletion if offline
+            onPressed: canDelete
+                ? () => iotService.deleteScheduleSlot(index)
+                : () => _showOfflineMessage(context),
           ),
         ],
       ),
@@ -159,6 +203,7 @@ class ScheduleList extends StatelessWidget {
   }
 
   void _handleAddNew(BuildContext context) async {
+    // ... (rest of _handleAddNew function remains unchanged)
     TimeOfDay? picked = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.now(),
@@ -178,6 +223,7 @@ class ScheduleList extends StatelessWidget {
   }
 
   void _showDurationDialog(BuildContext context, TimeOfDay pickedTime) {
+    // ... (rest of _showDurationDialog function remains unchanged)
     TextEditingController durController = TextEditingController(text: "15");
     showDialog(
       context: context,
@@ -229,6 +275,7 @@ class ScheduleList extends StatelessWidget {
     TimeOfDay time,
     int duration,
   ) async {
+    // ... (rest of _saveNewSchedule function remains unchanged)
     // 1. Get current active schedules to check for duplicates
     List<dynamic> schedules = await iotService.getSchedulesOnce();
 
