@@ -40,12 +40,13 @@ class IoTAuth {
 
     try {
       // v7.x: authenticate() replaces signIn()
-      final GoogleSignInAccount? googleUser = await _googleSignIn
-          .authenticate();
+      // This returns a non-nullable GoogleSignInAccount.
+      // If the user cancels, it throws an exception which jumps to catch().
+      final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
 
-      if (googleUser == null) return null;
+      // REMOVED: if (googleUser == null) return null;
 
-      // v7.x: authentication is synchronous
+      // v7.x: authentication is synchronous getter
       final GoogleSignInAuthentication googleAuth = googleUser.authentication;
 
       final credential = GoogleAuthProvider.credential(

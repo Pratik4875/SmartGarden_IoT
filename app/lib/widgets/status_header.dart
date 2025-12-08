@@ -107,9 +107,9 @@ class StatusHeader extends StatelessWidget {
                       if (waterSnap.hasData &&
                           waterSnap.data!.snapshot.value != null) {
                         final val = waterSnap.data!.snapshot.value;
-                        if (val is int)
+                        if (val is int) {
                           waterTs = val;
-                        else if (val is String)
+                        } else if (val is String)
                           waterTs = int.tryParse(val);
                       }
 
@@ -121,9 +121,9 @@ class StatusHeader extends StatelessWidget {
                           if (reqSnap.hasData &&
                               reqSnap.data!.snapshot.value != null) {
                             final val = reqSnap.data!.snapshot.value;
-                            if (val is int)
+                            if (val is int) {
                               reqTs = val;
-                            else if (val is String)
+                            } else if (val is String)
                               reqTs = int.tryParse(val);
                           }
 

@@ -215,9 +215,9 @@ class IoTControlAndData {
     if (snapshot.exists && snapshot.value != null) {
       try {
         List<dynamic> rawValues = [];
-        if (snapshot.value is Map)
+        if (snapshot.value is Map) {
           rawValues = (snapshot.value as Map).values.toList();
-        else if (snapshot.value is List)
+        } else if (snapshot.value is List)
           rawValues = snapshot.value as List;
 
         List<Map> cleanEntries = [];
@@ -231,8 +231,9 @@ class IoTControlAndData {
           return tsA.compareTo(tsB);
         });
 
-        if (cleanEntries.length > 24)
+        if (cleanEntries.length > 24) {
           cleanEntries = cleanEntries.sublist(cleanEntries.length - 24);
+        }
 
         int index = 0;
         for (var data in cleanEntries) {
@@ -250,16 +251,17 @@ class IoTControlAndData {
   }
 
   Future<Map<String, double>> getDailyInsights() async {
-    if (!_client.isConnected)
+    if (!_client.isConnected) {
       return {'minTemp': 0, 'maxTemp': 0, 'minSoil': 0, 'maxSoil': 0};
+    }
     final snapshot = await _client.db!.child('history').get();
 
     if (snapshot.exists && snapshot.value != null) {
       try {
         List<dynamic> rawValues = [];
-        if (snapshot.value is Map)
+        if (snapshot.value is Map) {
           rawValues = (snapshot.value as Map).values.toList();
-        else if (snapshot.value is List)
+        } else if (snapshot.value is List)
           rawValues = snapshot.value as List;
 
         int now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
@@ -279,8 +281,9 @@ class IoTControlAndData {
           }
         }
 
-        if (temps.isEmpty)
+        if (temps.isEmpty) {
           return {'minTemp': 0, 'maxTemp': 0, 'minSoil': 0, 'maxSoil': 0};
+        }
 
         return {
           'minTemp': temps.reduce(math.min),

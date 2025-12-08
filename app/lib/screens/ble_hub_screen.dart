@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'ble_led_screen.dart';
+import 'ble_terminal_screen.dart'; // <--- Add this line
+import 'classic_car_screen.dart';
 
 class BleHubScreen extends StatelessWidget {
   const BleHubScreen({super.key});
@@ -31,21 +34,44 @@ class BleHubScreen extends StatelessWidget {
               "LED Control",
               Icons.lightbulb,
               Colors.yellowAccent,
-              () {}, // Link to LedScreen later
+              () {
+                // NAVIGATE TO THE FUNCTIONAL SCREEN
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const BleLedScreen()),
+                );
+              },
             ),
+            // ... inside build() ...
             _buildBleOption(
               context,
               "RC Car",
               Icons.directions_car,
               Colors.redAccent,
-              () {}, // Link to CarScreen later
+              () {
+                // Navigate to the CLASSIC car screen
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ClassicCarScreen(),
+                  ),
+                );
+              },
             ),
             _buildBleOption(
               context,
               "Terminal",
               Icons.terminal,
               Colors.greenAccent,
-              () {}, // Link to TerminalScreen later
+              () {
+                // This tells Flutter to open the Terminal Screen
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const BleTerminalScreen(),
+                  ),
+                );
+              },
             ),
           ],
         ),
