@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ota_update/ota_update.dart';
+import 'package:ota_update/ota_update.dart'; // Import is now used
 import '../services/iot_service.dart';
 import '../widgets/custom_loading_animation.dart';
 import 'home_screen.dart';
@@ -18,74 +18,135 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _urlController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _nameController.text = widget.iotService.userName;
-    _loadUrl();
+    _initProfile();
   }
 
-  Future<void> _loadUrl() async {
+  Future<void> _initProfile() async {
+    String name = widget.iotService.userName;
+    String? photo = widget.iotService.photoUrl;
+
+    // Auto-fill from Google if available
+    final user = widget.iotService.firebaseAuth.currentUser;
+    if (user != null) {
+      if ((name == "Student" || name == "User" || name.isEmpty) &&
+          user.displayName != null) {
+        name = user.displayName!;
+        widget.iotService.updateProfileName(name);
+      }
+      if (photo == null && user.photoURL != null) {
+        photo = user.photoURL;
+        widget.iotService.updateProfilePhoto(photo!);
+      }
+    }
+
     final prefs = await SharedPreferences.getInstance();
+    String savedUrl = prefs.getString('firebase_url') ?? "";
+
     if (mounted) {
       setState(() {
-        _urlController.text = prefs.getString('firebase_url') ?? "";
+        _nameController.text = name;
+        _urlController.text = savedUrl;
       });
     }
   }
 
-  // --- UPDATE LOGIC ---
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _urlController.dispose();
+    super.dispose();
+  }
+
+  // --- ACTIONS ---
+
+  Future<void> _saveSettings() async {
+    if (_nameController.text.isEmpty) return;
+
+    setState(() => _isLoading = true);
+
+    await widget.iotService.updateProfileName(_nameController.text.trim());
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('firebase_url', _urlController.text.trim());
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Profile Updated! Restarting...")),
+    );
+
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const HomeScreen()),
+      (route) => false,
+    );
+  }
+
+  Future<void> _logout() async {
+    await widget.iotService.signOut();
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
+  // This function was unused before because the button was missing
   void _runUpdate() {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF2C2C2C),
-        title: const Text(
-          "System Update",
-          style: TextStyle(color: Colors.white),
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: Text(
+          "SYSTEM UPDATE",
+          style: GoogleFonts.robotoMono(color: Colors.cyanAccent),
         ),
         content: SizedBox(
-          height: 120,
+          height: 100,
           child: StreamBuilder<OtaEvent>(
             stream: widget.iotService.updateApp(),
             builder: (context, snapshot) {
-              if (!snapshot.hasData || snapshot.data == null) {
-                return const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CustomLoadingAnimation(size: 40),
-                      SizedBox(height: 15),
-                      Text(
-                        "Connecting...",
-                        style: TextStyle(color: Colors.white54),
-                      ),
-                    ],
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text(
+                    "Error: ${snapshot.error}",
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
                   ),
                 );
               }
+              if (!snapshot.hasData) {
+                return const Center(child: CustomLoadingAnimation(size: 40));
+              }
 
               final status = snapshot.data!.status;
-              String val = snapshot.data!.value ?? "0";
+              final val = snapshot.data!.value ?? "0";
 
               return Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  if (status == OtaStatus.DOWNLOADING)
-                    LinearProgressIndicator(
-                      value: (double.tryParse(val) ?? 0) / 100,
-                      color: Colors.cyanAccent,
-                      backgroundColor: Colors.white10,
-                    )
-                  else
-                    const CustomLoadingAnimation(size: 40),
-
-                  const SizedBox(height: 15),
                   Text(
-                    "${status.name} $val%",
+                    status.name,
                     style: const TextStyle(color: Colors.white70),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    "$val%",
+                    style: GoogleFonts.robotoMono(
+                      fontSize: 24,
+                      color: Colors.white,
+                    ),
                   ),
                 ],
               );
@@ -96,57 +157,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showPhotoDialog() {
-    final TextEditingController photoCtrl = TextEditingController(
-      text: widget.iotService.photoUrl,
-    );
-
+  void _editPhotoUrl() {
+    final ctrl = TextEditingController(text: widget.iotService.photoUrl);
     showDialog(
       context: context,
-      builder: (dialogCtx) => AlertDialog(
-        backgroundColor: const Color(0xFF2C2C2C),
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
         title: Text(
-          "Change Profile Picture",
-          style: GoogleFonts.poppins(color: Colors.white),
+          "IMAGE URL",
+          style: GoogleFonts.robotoMono(color: Colors.white),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              "Enter Image URL:",
-              style: GoogleFonts.poppins(color: Colors.white70),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: photoCtrl,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: "https://...",
-                filled: true,
-                fillColor: Colors.black12,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-          ],
+        content: TextField(
+          controller: ctrl,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: "https://...",
+            filled: true,
+            fillColor: Colors.white10,
+          ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text("CANCEL", style: TextStyle(color: Colors.grey)),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("CANCEL"),
           ),
           TextButton(
-            onPressed: () async {
-              if (photoCtrl.text.isNotEmpty) {
-                await widget.iotService.updateProfilePhoto(
-                  photoCtrl.text.trim(),
-                );
-                if (mounted) setState(() {});
-              }
-
-              // FIX: Use dialogCtx instead of context to avoid async gap warning
-              Navigator.pop(dialogCtx);
+            onPressed: () {
+              widget.iotService.updateProfilePhoto(ctrl.text.trim());
+              Navigator.pop(ctx);
+              setState(() {});
             },
             child: const Text(
               "SAVE",
@@ -158,271 +197,160 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Future<void> _saveDatabaseUrl() async {
-    final url = _urlController.text.trim();
-    if (url.isEmpty || !url.startsWith("http")) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Invalid URL")));
-      return;
-    }
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('firebase_url', url);
-
-    if (!mounted) return;
-
-    // FIX: Capture BuildContext before async gap
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
-
-    scaffoldMessenger.showSnackBar(
-      const SnackBar(content: Text("Garden Linked! Restarting...")),
-    );
-
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    if (!mounted) return;
-
-    navigator.pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const HomeScreen()),
-      (route) => false,
-    );
-  }
+  // --- UI ---
 
   @override
   Widget build(BuildContext context) {
+    ImageProvider? avatarImage;
+    if (widget.iotService.photoUrl != null &&
+        widget.iotService.photoUrl!.startsWith("http")) {
+      avatarImage = NetworkImage(widget.iotService.photoUrl!);
+    }
+
     return Scaffold(
-      backgroundColor: const Color(0xFF1E1E1E),
+      backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
+        title: Text(
+          "PROFILE",
+          style: GoogleFonts.robotoMono(color: Colors.white),
+        ),
         backgroundColor: Colors.transparent,
-        title: Text("Profile", style: GoogleFonts.poppins(color: Colors.white)),
-        leading: const BackButton(color: Colors.white),
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.only(left: 20, right: 20, bottom: 120),
+        padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            const SizedBox(height: 20),
-
-            // Avatar
-            Stack(
-              children: [
-                Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.cyanAccent, width: 3),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.cyanAccent.withValues(alpha: 0.3),
-                        blurRadius: 15,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: ClipOval(
-                    child: widget.iotService.photoUrl != null
-                        ? Image.network(
-                            widget.iotService.photoUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const Icon(
-                                  Icons.person,
-                                  size: 60,
-                                  color: Colors.grey,
-                                ),
-                          )
-                        : const Icon(
-                            Icons.person,
-                            size: 60,
-                            color: Colors.grey,
-                          ),
-                  ),
-                ),
-
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: GestureDetector(
-                    onTap: _showPhotoDialog,
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.edit,
-                        size: 20,
-                        color: Colors.black,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+            // 1. AVATAR
+            GestureDetector(
+              onTap: _editPhotoUrl,
+              child: CircleAvatar(
+                radius: 60,
+                backgroundColor: Colors.cyanAccent.withValues(alpha: 0.2),
+                backgroundImage: avatarImage,
+                onBackgroundImageError: avatarImage != null ? (_, _) {} : null,
+                child: avatarImage == null
+                    ? const Icon(Icons.person, size: 60, color: Colors.white)
+                    : null,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              "Tap to change photo",
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.5),
+                fontSize: 12,
+              ),
             ),
 
             const SizedBox(height: 30),
 
-            // Name Field
+            // 2. NAME FIELD
             TextField(
               controller: _nameController,
-              style: const TextStyle(color: Colors.white),
+              style: GoogleFonts.robotoMono(color: Colors.white),
               decoration: InputDecoration(
-                labelText: "Display Name",
+                labelText: "DISPLAY NAME",
                 labelStyle: const TextStyle(color: Colors.grey),
                 filled: true,
                 fillColor: Colors.white10,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.save, color: Colors.cyanAccent),
-                  onPressed: () async {
-                    await widget.iotService.updateProfileName(
-                      _nameController.text,
-                    );
-
-                    if (!mounted) return;
-
-                    // FIX: Capture ScaffoldMessenger before async gap
-                    final scaffoldMessenger = ScaffoldMessenger.of(context);
-
-                    scaffoldMessenger.showSnackBar(
-                      const SnackBar(content: Text("Name Saved")),
-                    );
-
-                    setState(() {});
-                  },
-                ),
+                prefixIcon: const Icon(Icons.badge, color: Colors.cyanAccent),
               ),
             ),
+            const SizedBox(height: 20),
 
-            const SizedBox(height: 30),
-
-            // DB Link
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.black26,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Colors.orangeAccent.withValues(alpha: 0.5),
+            // 3. DATABASE URL FIELD
+            TextField(
+              controller: _urlController,
+              style: GoogleFonts.robotoMono(color: Colors.white),
+              decoration: InputDecoration(
+                labelText: "FIREBASE DATABASE URL",
+                labelStyle: const TextStyle(color: Colors.grey),
+                filled: true,
+                fillColor: Colors.white10,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
                 ),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.link, color: Colors.orangeAccent),
-                      const SizedBox(width: 10),
-                      Text(
-                        "Link Garden Database",
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 15),
-
-                  TextField(
-                    controller: _urlController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: "https://...",
-                      filled: true,
-                      fillColor: Colors.black12,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 15),
-
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orangeAccent,
-                      ),
-                      onPressed: _saveDatabaseUrl,
-                      child: const Text(
-                        "SAVE & CONNECT",
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                hintText: "https://...firebaseio.com",
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.3),
+                ),
+                prefixIcon: const Icon(Icons.link, color: Colors.cyanAccent),
               ),
             ),
-
             const SizedBox(height: 30),
 
+            // 4. FIRMWARE UPDATE BUTTON (Added back to fix unused_element error)
             ListTile(
               onTap: _runUpdate,
               tileColor: Colors.white10,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
               ),
               leading: const Icon(
                 Icons.system_update,
-                color: Colors.cyanAccent,
+                color: Colors.orangeAccent,
               ),
               title: Text(
-                "Check for Updates",
-                style: GoogleFonts.poppins(color: Colors.white),
+                "CHECK FIRMWARE UPDATE",
+                style: GoogleFonts.robotoMono(color: Colors.white),
               ),
               trailing: const Icon(
                 Icons.arrow_forward_ios,
-                color: Colors.white54,
+                color: Colors.grey,
                 size: 16,
               ),
             ),
-
             const SizedBox(height: 20),
 
-            // Logout
+            // 5. SAVE BUTTON
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.cyanAccent,
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onPressed: _isLoading ? null : _saveSettings,
+                child: _isLoading
+                    ? const CircularProgressIndicator(color: Colors.black)
+                    : Text(
+                        "SAVE & CONNECT",
+                        style: GoogleFonts.robotoMono(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // 6. LOGOUT BUTTON
             SizedBox(
               width: double.infinity,
               height: 50,
               child: OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Colors.redAccent),
+                  foregroundColor: Colors.redAccent,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                icon: const Icon(Icons.logout, color: Colors.redAccent),
+                onPressed: _logout,
+                icon: const Icon(Icons.logout),
                 label: Text(
-                  "Sign Out",
-                  style: GoogleFonts.poppins(
-                    color: Colors.redAccent,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  "LOGOUT",
+                  style: GoogleFonts.robotoMono(fontWeight: FontWeight.bold),
                 ),
-                onPressed: () async {
-                  await widget.iotService.signOut();
-
-                  if (!mounted) return;
-
-                  // FIX: Capture Navigator before async gap
-                  final navigator = Navigator.of(context);
-
-                  navigator.pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (_) => const LoginScreen()),
-                    (route) => false,
-                  );
-                },
               ),
             ),
           ],

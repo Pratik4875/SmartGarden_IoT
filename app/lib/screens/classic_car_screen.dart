@@ -301,7 +301,7 @@ class _ClassicCarScreenState extends State<ClassicCarScreen> {
                   ),
                   Switch(
                     value: _lineFollowerMode,
-                    activeColor: Colors.purpleAccent,
+                    activeThumbColor: Colors.purpleAccent,
                     activeTrackColor: Colors.purple.withValues(alpha: 0.3),
                     inactiveThumbColor: Colors.cyanAccent,
                     inactiveTrackColor: Colors.cyan.withValues(alpha: 0.3),

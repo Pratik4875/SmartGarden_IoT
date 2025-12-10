@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/iot_service.dart';
-import 'smart_garden_screen.dart'; // Ensure this file exists
+import 'smart_garden_screen.dart';
 import 'profile_screen.dart';
-import 'ble_hub_screen.dart'; // Ensure this file exists
+import 'ble_hub_screen.dart';
+import 'iot_hub_screen.dart';
+import 'wifi_hub_screen.dart'; // <--- IMPORT THE NEW SCREEN
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,7 +21,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Initialize Service (Loads saved URL automatically)
     _iot = IoTService();
   }
 
@@ -30,10 +31,10 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        automaticallyImplyLeading: false, // Don't show back button on Hub
+        automaticallyImplyLeading: false,
         title: Row(
           children: [
-            // Ensure you have assets/logo.svg
+            // Make sure you have assets/logo.svg or change this to an Icon
             SvgPicture.asset('assets/logo.svg', height: 30),
             const SizedBox(width: 10),
             Text(
@@ -55,17 +56,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   : null,
             ),
             onPressed: () {
-              // Navigate to Profile and refresh state when returning
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) => ProfileScreen(iotService: _iot),
                 ),
-              ).then((_) {
-                setState(() {
-                  // Triggers rebuild to update Name/Photo if changed
-                });
-              });
+              ).then((_) => setState(() {}));
             },
           ),
         ],
@@ -85,8 +81,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 30),
 
+            // --- SECTION 1: SMART PRODUCTS ---
             Text(
-              "WI-FI PROJECTS",
+              "MY DEVICES",
               style: GoogleFonts.poppins(
                 color: Colors.grey,
                 fontSize: 12,
@@ -95,7 +92,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 15),
 
-            // 1. Smart Garden Card (Reactive Status)
             StreamBuilder<bool>(
               stream: _iot.onlineStatusStream,
               initialData: false,
@@ -138,7 +134,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 15),
 
-            // 2. Home Automation Card
             _buildProjectCard(
               title: "Home Automation",
               subtitle: "Lights & Switches",
@@ -152,6 +147,34 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
 
             const SizedBox(height: 30),
+
+            // --- SECTION 2: CLOUD LAB (IOT) ---
+            Text(
+              "CLOUD LAB (IOT)",
+              style: GoogleFonts.poppins(
+                color: Colors.grey,
+                fontSize: 12,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(height: 15),
+
+            _buildProjectCard(
+              title: "IoT Command Center",
+              subtitle: "Cloud Car, Terminal & LED",
+              icon: Icons.cloud_circle,
+              color: Colors.purpleAccent,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => IoTHubScreen(iotService: _iot),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
+            // --- SECTION 3: LOCAL CONTROL (BLE) ---
             Text(
               "LOCAL CONTROL (BLE)",
               style: GoogleFonts.poppins(
@@ -162,10 +185,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 15),
 
-            // 3. Bluetooth Hub Card
             _buildProjectCard(
               title: "Bluetooth Hub",
-              subtitle: "Car, LED & Terminal",
+              subtitle: "Direct RC Control & Debug",
               icon: Icons.bluetooth,
               color: Colors.blueAccent,
               onTap: () => Navigator.push(
@@ -173,6 +195,33 @@ class _HomeScreenState extends State<HomeScreen> {
                 MaterialPageRoute(builder: (_) => const BleHubScreen()),
               ),
             ),
+
+            const SizedBox(height: 30),
+
+            // --- SECTION 4: LOCAL CONTROL (WIFI) ---
+            Text(
+              "LOCAL CONTROL (WIFI)",
+              style: GoogleFonts.poppins(
+                color: Colors.grey,
+                fontSize: 12,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(height: 15),
+
+            // NEW CARD FOR WIFI HUB
+            _buildProjectCard(
+              title: "WiFi Direct Hub",
+              subtitle: "Access Point (AP) Mode",
+              icon: Icons.wifi_tethering,
+              color: Colors.cyanAccent,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const WiFiHubScreen()),
+              ),
+            ),
+
+            const SizedBox(height: 40),
           ],
         ),
       ),
@@ -193,7 +242,6 @@ class _HomeScreenState extends State<HomeScreen> {
         decoration: BoxDecoration(
           color: const Color(0xFF2C2C2C),
           borderRadius: BorderRadius.circular(20),
-          // Updated: withValues(alpha: ...) handles opacity correctly
           border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
           boxShadow: [
             BoxShadow(

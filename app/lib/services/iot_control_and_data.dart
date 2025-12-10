@@ -28,7 +28,6 @@ class IoTControlAndData {
   IoTControlAndData(this._client);
 
   // --- STREAMS ---
-  // FIX: Using public .db accessor
   Stream<DatabaseEvent> get pumpStatusStream =>
       _client.db?.child('control/pump').onValue ??
       const Stream<DatabaseEvent>.empty();
@@ -217,8 +216,10 @@ class IoTControlAndData {
         List<dynamic> rawValues = [];
         if (snapshot.value is Map) {
           rawValues = (snapshot.value as Map).values.toList();
-        } else if (snapshot.value is List)
+        } else if (snapshot.value is List) {
+          // FIXED: Added braces
           rawValues = snapshot.value as List;
+        }
 
         List<Map> cleanEntries = [];
         for (var item in rawValues) {
@@ -261,8 +262,10 @@ class IoTControlAndData {
         List<dynamic> rawValues = [];
         if (snapshot.value is Map) {
           rawValues = (snapshot.value as Map).values.toList();
-        } else if (snapshot.value is List)
+        } else if (snapshot.value is List) {
+          // FIXED: Added braces
           rawValues = snapshot.value as List;
+        }
 
         int now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
         int oneDayAgo = now - 86400;

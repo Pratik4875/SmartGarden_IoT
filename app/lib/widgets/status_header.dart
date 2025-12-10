@@ -13,8 +13,6 @@ class StatusHeader extends StatelessWidget {
     if (timestamp <= 0) return "Never";
 
     // Auto-detect Milliseconds vs Seconds
-    // 1600000000 is approx Year 2020 in seconds.
-    // If it's larger than 100 billion, it's definitely milliseconds.
     int timeInMs = timestamp;
     if (timestamp < 100000000000) {
       timeInMs = timestamp * 1000;
@@ -23,7 +21,6 @@ class StatusHeader extends StatelessWidget {
     final dt = DateTime.fromMillisecondsSinceEpoch(timeInMs);
     final now = DateTime.now();
 
-    // Check if the date is absurdly far in the future (e.g. wrong scaling)
     if (dt.year > now.year + 1) return "Invalid Date";
 
     final diff = now.difference(dt);
@@ -109,8 +106,10 @@ class StatusHeader extends StatelessWidget {
                         final val = waterSnap.data!.snapshot.value;
                         if (val is int) {
                           waterTs = val;
-                        } else if (val is String)
+                        } else if (val is String) {
+                          // FIXED: Added braces
                           waterTs = int.tryParse(val);
+                        }
                       }
 
                       // 2. Fetch "Last Requested" time (from App) as fallback
@@ -123,19 +122,18 @@ class StatusHeader extends StatelessWidget {
                             final val = reqSnap.data!.snapshot.value;
                             if (val is int) {
                               reqTs = val;
-                            } else if (val is String)
+                            } else if (val is String) {
+                              // FIXED: Added braces
                               reqTs = int.tryParse(val);
+                            }
                           }
 
-                          // LOGIC: Prefer 'Watered' time if it looks valid (> 2020).
-                          // Otherwise, use 'Requested' time if valid.
                           String timeText = "Never";
 
                           // 1600000000 is ~Year 2020 in seconds
                           if (waterTs != null && waterTs > 1600000000) {
                             timeText = _formatTimestamp(waterTs);
                           } else if (reqTs != null && reqTs > 1600000000) {
-                            // If falling back to request time, append "(Req)" so user knows it's an estimate
                             timeText = "${_formatTimestamp(reqTs)} (Req)";
                           }
 
