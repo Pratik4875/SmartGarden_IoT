@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/iot_service.dart';
-import 'smart_garden_screen.dart';
+// import 'smart_garden_screen.dart'; // COMMENTED OUT - Feature under maintenance
 import 'profile_screen.dart';
 import 'ble_hub_screen.dart';
+import '../widgets/maintenance_dialog.dart'; // ADD THIS
 import 'iot_hub_screen.dart';
 import 'wifi_hub_screen.dart'; // <--- IMPORT THE NEW SCREEN
 
@@ -99,9 +100,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 final bool isOnline = snapshot.data ?? false;
                 final bool isConfigured = _iot.isConnected;
 
-                String statusText = "Setup Required";
-                Color statusColor = Colors.grey;
+                // 🔧 MAINTENANCE MODE
+                String statusText = "Under Maintenance";
+                Color statusColor = Colors.orangeAccent;
 
+                /* ORIGINAL STATUS LOGIC - COMMENTED OUT
+                if (isConfigured) {
+                  statusText = isOnline
+                      ? "Online • Pump Standby"
+                      : "Offline (Last seen > 2m ago)";
+                  statusColor = isOnline
+                      ? Colors.greenAccent
+                      : Colors.redAccent;
+                }
+                */
+
+                // Even if configured, we force maintenance mode text for now
                 if (isConfigured) {
                   statusText = isOnline
                       ? "Online • Pump Standby"
@@ -117,6 +131,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: Icons.grass,
                   color: statusColor,
                   onTap: () {
+                    // 🆕 SHOW MAINTENANCE DIALOG
+                    MaintenanceDialog.show(
+                      context,
+                      "Smart Garden",
+                      customMessage:
+                          "We're upgrading the Smart Garden experience with new sensors and automation features. Stay tuned!",
+                    );
+
+                    /* ORIGINAL NAVIGATION - COMMENTED OUT
                     if (isConfigured) {
                       Navigator.push(
                         context,
@@ -127,6 +150,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     } else {
                       _showSetupDialog();
                     }
+                    */
                   },
                 );
               },
@@ -291,6 +315,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // UNUSED METHOD - Commented out to fix analysis warning
+  /*
   void _showSetupDialog() {
     showDialog(
       context: context,
@@ -321,4 +347,5 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+  */
 }
