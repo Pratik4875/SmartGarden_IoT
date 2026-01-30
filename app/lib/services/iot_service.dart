@@ -470,7 +470,9 @@ class IoTService implements AuthClient, ControlDataClient {
       }
   }
 
-  @override 
+  }
+}
+
 class MockDatabaseEvent implements DatabaseEvent {
   final dynamic _val;
   MockDatabaseEvent(this._val);
