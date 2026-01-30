@@ -9,6 +9,7 @@ import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:ota_update/ota_update.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'notification_service.dart';
 import 'iot_auth.dart';
@@ -259,7 +260,7 @@ class IoTService implements AuthClient, ControlDataClient {
      return [];
   }
   @override 
-  Stream<OtaEvent> updateApp() => const Stream.empty();
+  Stream<OtaEvent> updateApp({String? url}) => const Stream.empty();
   @override 
   Future<String> forceStatusRefresh() async {
      // Re-trigger polling instantly
@@ -395,9 +396,81 @@ class IoTService implements AuthClient, ControlDataClient {
     _fastClient.close();
     mqtt?.disconnect();
   }
-}
+// --- UPDATE LOGIC --
+  Future<Map<String, dynamic>> checkForUpdate() async {
+    const url = "https://api.github.com/repos/Pratik4875/SmartGarden_IoT/releases/latest";
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final String latestTag = data['tag_name'] ?? "";
+        
+        // Get Current Version
+        PackageInfo packageInfo = await PackageInfo.fromPlatform();
+        String currentVersion = "v${packageInfo.version}"; 
+        // Note: pubspec version 1.5.0 becomes packageInfo.version="1.5.0"
+        // GitHub tag is likely "v1.5". We should normalize.
+        
+        bool updateAvailable = _compareVersions(currentVersion, latestTag);
+        
+        String? downloadUrl;
+        if (data['assets'] != null) {
+          for (var asset in data['assets']) {
+            if (asset['name'].toString().endsWith('.apk')) {
+              downloadUrl = asset['browser_download_url'];
+              break;
+            }
+          }
+        }
+        
+        return {
+          "updateAvailable": updateAvailable,
+          "latestVersion": latestTag,
+          "currentVersion": currentVersion,
+          "downloadUrl": downloadUrl
+        };
+      }
+    } catch (e) {
+      debugPrint("Update Check Failed: $e");
+    }
+    return {"updateAvailable": false};
+  }
+  
+  bool _compareVersions(String current, String latest) {
+    // Simple comparison: v1.5 vs v1.6
+    String c = current.replaceAll(RegExp(r'[^0-9.]'), ''); // 1.5.0
+    String l = latest.replaceAll(RegExp(r'[^0-9.]'), '');  // 1.6
+    
+    // Split and compare parts
+    List<int> cParts = c.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    List<int> lParts = l.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    
+    for (int i = 0; i < lParts.length; i++) {
+      int cPart = (i < cParts.length) ? cParts[i] : 0;
+      int lPart = lParts[i];
+      if (lPart > cPart) return true;
+      if (lPart < cPart) return false;
+    }
+    return false;
+  }
 
-// --- MOCK CLASSES ---
+  @override 
+  Stream<OtaEvent> updateApp({String? url}) {
+      if (url == null) return const Stream.empty();
+      // Cache Busting: Add timestamp to filename to avoid installing old cached APK
+      String filename = "EcoSync_${DateTime.now().millisecondsSinceEpoch}.apk";
+      try {
+        return OtaUpdate().execute(
+          url,
+          destinationFilename: filename, 
+        );
+      } catch (e) {
+        debugPrint("OTA Error: $e");
+        return Stream.error(e);
+      }
+  }
+
+  @override 
 class MockDatabaseEvent implements DatabaseEvent {
   final dynamic _val;
   MockDatabaseEvent(this._val);

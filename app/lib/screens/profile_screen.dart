@@ -100,22 +100,81 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // This function was unused before because the button was missing
-  void _runUpdate() {
+  void _runUpdate() async {
+    // 1. Show Checking Dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        content: Row(
+          children: [
+            const CustomLoadingAnimation(size: 30),
+            const SizedBox(width: 20),
+            Text(
+              "Checking for updates...",
+              style: GoogleFonts.robotoMono(color: Colors.white),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    // 2. Perform Check
+    final result = await widget.iotService.checkForUpdate();
+    if (!mounted) return;
+    Navigator.pop(context); // Close "Checking..."
+
+    bool available = result['updateAvailable'] ?? false;
+    String version = result['latestVersion'] ?? "Unk";
+    String? downloadUrl = result['downloadUrl'];
+
+    if (!available) {
+      // 3A. No Update
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("App is up to date!")),
+      );
+    } else if (downloadUrl != null) {
+      // 3B. Update Available -> Ask User
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          title: Text("UPDATE AVAILABLE ($version)", style: const TextStyle(color: Colors.cyanAccent)),
+          content: Text("A new version is available. Download now?", style: GoogleFonts.robotoMono(color: Colors.white70)),
+          actions: [
+            TextButton(
+               onPressed: () => Navigator.pop(context),
+               child: const Text("LATER"),
+            ),
+            TextButton(
+               onPressed: () {
+                 Navigator.pop(context);
+                 _startDownload(downloadUrl);
+               },
+               child: const Text("UPDATE", style: TextStyle(color: Colors.cyanAccent)),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  void _startDownload(String url) {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E1E),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         title: Text(
-          "SYSTEM UPDATE",
+          "DOWNLOADING...",
           style: GoogleFonts.robotoMono(color: Colors.cyanAccent),
         ),
         content: SizedBox(
           height: 100,
           child: StreamBuilder<OtaEvent>(
-            stream: widget.iotService.updateApp(),
+            stream: widget.iotService.updateApp(url: url),
             builder: (context, snapshot) {
               if (snapshot.hasError) {
                 return Center(
@@ -136,7 +195,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               return Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
+                   Text(
                     status.name,
                     style: const TextStyle(color: Colors.white70),
                   ),
