@@ -1,157 +1,64 @@
-<div align="center">
-
-🌱 EcoSync IoT
-
-Smart Automation for a Greener Home
-
-<p align="center">
-<b>EcoSync</b> transforms your garden into a secure, data-driven IoT ecosystem. 
-
-
-
-
-Control pumps, monitor soil health, and automate watering schedules from anywhere in the world.
-</p>
-
-Report Bug • Request Feature
-
-</div>
-
-📱 Interface Gallery
-
-<div align="center">
-
-Secure Hub Login
-
-Real-Time Dashboard
-
-History Analytics
-
-<img src="docs/login.png" width="260" alt="Login Screen">
-
-<img src="docs/dashboard.png" width="260" alt="Dashboard">
-
-<img src="docs/history.png" width="260" alt="Analytics">
-
-Connect securely to your personal IoT Hub.
-
-Control pump, set schedules, and view sensors.
-
-Visualize temp/moisture trends over 24h.
-
-</div>
-
-🚀 Key Features
-
-🔒 Enterprise-Grade Security
-
-Anonymous Authentication: The app performs a silent, encrypted handshake with Firebase.
-
-Database Secrets: Firmware uses privileged Admin tokens to bypass locked rules (auth != null).
-
-Hub Connection: No hardcoded secrets; users connect dynamically via the Login Screen.
-
-⏱️ Precision Automation
-
-Smart Scheduler: Set daily watering times with specific Duration Control (e.g., "Water for 15s at 9:00 AM").
-
-Conflict Resolution: Unified firmware logic prevents "Ghost Switching" between Manual and Auto modes.
-
-Safety Cutoff: Hard-coded dynamic limit prevents flooding even if WiFi fails.
-
-📊 Data Intelligence
-
-History Logger: ESP8266 snapshots sensor data every 60 minutes.
-
-Interactive Graphs: Visualize trends using fl_chart for better plant health insights.
-
-🔄 DevOps & Quality
-
-Auto-Update: The app intelligently checks GitHub Releases and installs new versions (v1.4+) automatically.
-
-Power Optimization: WIFI_NONE_SLEEP mode ensures compatibility with power banks by preventing auto-shutdown.
-
-🏗 System Architecture
-
-The system operates on a Dual-Power Architecture (Solar + Lithium Buffer) and uses a robust REST API protocol.
-
-Component
-
-Responsibility
-
-Frequency
-
-Uplink
-
-Pushes DHT11 (Temp/Hum) and Soil data to Cloud.
-
-Every 10s
-
-Downlink
-
-Polls command queue for instant pump reaction.
-
-Every 200ms
-
-Loglink
-
-Pushes data snapshot to /history for analytics.
-
-Every 1 Hour
-
-🔌 Hardware Stack
-
-MCU: ESP8266 (NodeMCU/Wemos D1 Mini)
-
-Sensors: DHT11, Capacitive Soil Moisture v1.2
-
-Actuators: 5V Relay (Active Low / Open-Drain)
-
-Power: 45x80mm Solar Panel → TP4056 → Li-Ion → 5V Boost
-
-🛠️ Installation Guide
-
-<details>
-<summary><b>🔌 Firmware Setup (ESP8266)</b></summary>
-
-Clone this repo:
-
-git clone [https://github.com/Pratik4875/SmartGarden_IoT.git](https://github.com/Pratik4875/SmartGarden_IoT.git)
-
-
-Navigate to Arduino/src/ and open in Arduino IDE or PlatformIO.
-
-Rename secrets_template.h to secrets.h.
-
-Add your WiFi creds and Database Secret (from Firebase Console).
-
-Flash via USB (recommended for v2.3 security update).
-
-</details>
-
-<details>
-<summary><b>📱 App Setup (Flutter)</b></summary>
-
-Navigate to app/.
-
-Install dependencies:
-
-flutter pub get
-
-
-Run on device:
-
-flutter run
-
-
-Or download the APK: Go to Releases and install app-release.apk.
-
-</details>
-
-📄 License
-
-Distributed under the MIT License. See LICENSE for more information.
-
-<div align="center">
-<sub>Built with 💚 by Pratik4875 using Flutter & ESP8266</sub>
-</div>
+# Smart Garden IoT 🌿
+
+A complete IoT solution for automated plant watering and monitoring using ESP8266 and Flutter.
+
+## Features
+- **Remote Monitoring**: View Soil Moisture, Temperature (optional), and Pump Status in real-time via the App.
+- **Smart Control**: Manually toggle the pump or let the automation handle it based on soil moisture levels.
+- **History & Analysis**: View historical data graphs and daily insights (Min/Max Moisture).
+- **Auto-Lock**: Safety feature to automatically turn off the pump after 15 seconds to prevent overflow.
+- **Cooldown**: Prevents rapid toggling of the pump.
+- **Scheduler**: Set specific times for watering.
+
+## Getting Started
+
+### Prerequisites
+1.  **Hardware**: ESP8266 (NodeMCU or D1 Mini), Soil Moisture Sensor (Analog), Relay Module, Water Pump.
+2.  **Software**: Arduino IDE, Flutter SDK.
+3.  **Cloud**: Firebase Account (Realtime Database).
+
+---
+
+### Step 1: Firebase Setup
+1.  Go to [Firebase Console](https://console.firebase.google.com/).
+2.  Create a new project.
+3.  Navigate to **Realtime Database** and create a database (Start in **Test Mode** or configure rules to `true` for read/write for testing).
+4.  Copy your **Database URL** (e.g., `https://your-project.firebaseio.com/`).
+5.  Go to **Project Settings** -> **Service Accounts** -> **Database Secrets** and copy the **Secret**.
+
+### Step 2: Hardware Setup (ESP8266)
+1.  Open `Arduino/src/Main/Main.ino` in Arduino IDE.
+2.  Install required libraries: `FirebaseESP8266`, `ArduinoJson`, `NTPClient`.
+3.  **Configuration**:
+    -   Rename `secrets_template.h` to `secrets.h`.
+    -   Fill in your WiFi credentials, Firebase URL, and Secret.
+    ```cpp
+    #define WIFI_SSID "YourWiFiName"
+    #define WIFI_PASSWORD "YourWiFiPass"
+    #define DB_URL "https://your-project.firebaseio.com"
+    #define DB_SECRET "YourFirebaseSecret"
+    ```
+4.  Upload the code to your ESP8266.
+
+### Step 3: App Setup (Flutter)
+1.  Navigate to the `app` directory.
+2.  Run `flutter pub get` to install dependencies.
+3.  **Connect**:
+    -   Open the App.
+    -   Enter your **Firebase Database URL** when prompted (or in Settings).
+    -   The app will automatically connect to your garden!
+
+---
+
+## Directory Structure
+-   `Arduino/`: Code for the ESP8266 microcontroller.
+-   `app/`: Flutter mobile application source code.
+-   `docs/`: Documentation and screenshots.
+
+## Photos
+*(This is where you can upload photos of your setup)*
+<!-- Add your photos in the docs/photos folder and link them here -->
+<!-- ![My Setup](docs/photos/setup.jpg) -->
+
+## License
+MIT
