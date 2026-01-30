@@ -260,8 +260,6 @@ class IoTService implements AuthClient, ControlDataClient {
      return [];
   }
   @override 
-  Stream<OtaEvent> updateApp({String? url}) => const Stream.empty();
-  @override 
   Future<String> forceStatusRefresh() async {
      // Re-trigger polling instantly
      await _fetchAndEmit('status/sensors/mapped', _soilCtrl);
@@ -470,7 +468,6 @@ class IoTService implements AuthClient, ControlDataClient {
       }
   }
 
-  }
 }
 
 class MockDatabaseEvent implements DatabaseEvent {
