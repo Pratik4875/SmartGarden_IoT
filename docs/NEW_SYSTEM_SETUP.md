@@ -11,10 +11,17 @@ Since you want a "new system", you need a new database so the data doesn't mix w
 4.  Go to **Build** -> **Realtime Database** -> **Create Database**.
     *   Select a location (e.g., Singapore/US).
     *   **Start in Test Mode** (easiest for setup).
+    *   *Note: "Test Mode" means you don't need complex rules. Students won't face permission errors.*
 5.  **Get Credentials**:
     *   **Database URL**: Copy the URL at the top of the Data tab (e.g., `https://smartgarden-student1-default-rtdb.asia-southeast1.firebasedatabase.app/`).
     *   **Database Secret**: Go to **Project Settings** (Gear icon) -> **Service Accounts** -> **Database Secrets**.
         *   Hover over the secret and click **Show**. Copy it.
+
+### ❓ Common Questions
+*   **Do I need to create tables/fields?**
+    *   **NO!** You just create the empty database. The ESP8266 code will automatically create all the necessary fields (`status`, `sensors`, `control`) the moment it turns on. No manual work needed!
+*   **Do I need SHA-1 Keys or Google Login setup?**
+    *   **NO!** Since you are using the pre-built `EcoSync.apk`, you skip all that. The app uses a special "Universal Connection" mode. You just paste the URL, and it works. No certificates required!
 
 ## 2. Flash the New ESP8266
 Now we need to tell the new hardware to talk to *this* new database.
