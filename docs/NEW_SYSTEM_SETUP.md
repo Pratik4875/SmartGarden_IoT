@@ -24,6 +24,20 @@ Since you want a "new system", you need a new database so the data doesn't mix w
     *   **Database Secret**: Go to **Project Settings** (Gear icon) -> **Service Accounts** -> **Database Secrets**.
         *   Hover over the secret and click **Show**. Copy it.
 
+### ⚠️ IMPORTANT: Configure Database Rules
+If the app is not reacting (can't turn on pump), the database might be "Locked".
+1.  Go to **Realtime Database** -> **Rules**.
+2.  Change them to this (Test Mode = Public):
+    ```json
+    {
+      "rules": {
+        ".read": true,
+        ".write": true
+      }
+    }
+    ```
+3.  Click **Publish**. Now the App can write to the database!
+
 ### ❓ Common Questions
 *   **Do I need to create tables/fields?**
     *   **NO!** You just create the empty database. The ESP8266 code will automatically create all the necessary fields (`status`, `sensors`, `control`) the moment it turns on. No manual work needed!
