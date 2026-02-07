@@ -20,7 +20,7 @@ bool pumpStatus = false;
 // --- Timers ---
 unsigned long previousMillis = 0;
 // const long interval = 500; // OLD: 500ms
-const long interval = 900000; // NEW: 15 Minutes (15 * 60 * 1000)
+const long interval = 5000; // NEW: 5 Seconds (Constant Update)
 
 unsigned long previousHeartbeatMillis = 0;
 const long heartbeatInterval = 30000; // 30 Seconds
@@ -106,7 +106,8 @@ void takeReading() {
       pumpStatus = false;
     }
     
-    // Update One-Time Status
+    // --- NEW: HISTORY LOGGING (Rate Limited) ---
+    // Update live status every time
     String json = "{";
     json += "\"raw\":" + String(soil1) + ",";
     json += "\"mapped\":" + String(soil2) + ",";
@@ -114,15 +115,21 @@ void takeReading() {
     json += "}";
     dbWrite("/status/sensors", json);
 
-    // --- NEW: HISTORY LOGGING ---
-    String hJson = "{";
-    hJson += "\"t\":" + String(timeClient.getEpochTime()) + ","; // Time
-    hJson += "\"m\":" + String(soil2) + ",";                     // Moisture
-    hJson += "\"p\":" + String(pumpStatus ? 1 : 0);              // Pump (0/1)
-    hJson += "}";
-    
-    // Path: /history/log/<timestamp>
-    dbWrite("/history/log/" + String(timeClient.getEpochTime()), hJson);
+    // Only log history every hour (to save DB space/bandwidth)
+    // 3600 seconds * 1000ms = 3600000
+    static unsigned long lastHistoryTime = 0;
+    if (millis() - lastHistoryTime > 3600000 || lastHistoryTime == 0) {
+        String hJson = "{";
+        hJson += "\"t\":" + String(timeClient.getEpochTime()) + ","; // Time
+        hJson += "\"m\":" + String(soil2) + ",";                     // Moisture
+        hJson += "\"p\":" + String(pumpStatus ? 1 : 0);              // Pump (0/1)
+        hJson += "}";
+        
+        // Path: /history/log/<timestamp>
+        dbWrite("/history/log/" + String(timeClient.getEpochTime()), hJson);
+        lastHistoryTime = millis();
+        Serial.println("History Logged");
+    }
 }
 
 void setup() {
