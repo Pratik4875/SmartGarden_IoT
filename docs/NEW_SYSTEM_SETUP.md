@@ -24,15 +24,17 @@ Since you want a "new system", you need a new database so the data doesn't mix w
     *   **NO!** Since you are using the pre-built `EcoSync.apk`, you skip all that. The app uses a special "Universal Connection" mode. You just paste the URL, and it works. No certificates required!
 
 ## 2. Flash the New ESP8266
-Now we need to tell the new hardware to talk to *this* new database.
+You will use the **Standard / Normal Code** (`Main.ino`) for the students. This assumes a standard relay or MOSFET setup.
 
 1.  Open the `SmartGarden_IoT` project in **Arduino IDE**.
-2.  Open `Arduino/src/Main/secrets.h`.
-3.  **Update the Credentials**:
+2.  **Select the File**: Verify you are editing `Arduino/src/Main/Main.ino`.
+    *   *Do NOT use `Main_Buck.ino` unless you are specifically using a Buck Converter setup.*
+3.  Open `Arduino/src/Main/secrets.h`.
+4.  **Update the Credentials**:
     *   `WIFI_SSID` & `WIFI_PASSWORD`: Your local WiFi details where the device will live.
     *   `DB_URL`: Paste the **NEW** Firebase URL you copied above.
     *   `DB_SECRET`: Paste the **NEW** Secret you copied above.
-4.  **Upload Code**:
+5.  **Upload Code**:
     *   Connect your new ESP8266 via USB.
     *   Select the correct Board (NodeMCU 1.0) and Port.
     *   Click **Upload** (Right Arrow).
