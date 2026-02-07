@@ -2,6 +2,13 @@
 
 This guide explains how to set up a completely fresh system (New ESP8266 + New Firebase Database) while using the existing App.
 
+## 0. Prerequisites (Install Libraries)
+Before you start, you must install the required libraries in Arduino IDE.
+**Sketch** -> **Include Library** -> **Manage Libraries...**
+Search for and install:
+1.  **ArduinoJson** (by Benoit Blanchon) - *Select Version 6.x.x*
+2.  **NTPClient** (by Fabrice Weinberg)
+
 ## 1. Create a New Firebase Project
 Since you want a "new system", you need a new database so the data doesn't mix with your old one.
 
@@ -29,12 +36,11 @@ You will use the **Standard / Normal Code** (`Main.ino`) for the students. This 
 1.  Open the `SmartGarden_IoT` project in **Arduino IDE**.
 2.  **Select the File**: Verify you are editing `Arduino/src/Main/Main.ino`.
     *   *Do NOT use `Main_Buck.ino` unless you are specifically using a Buck Converter setup.*
-3.  Open `Arduino/src/Main/secrets.h`.
-4.  **Update the Credentials**:
-    *   `WIFI_SSID` & `WIFI_PASSWORD`: Your local WiFi details where the device will live.
-    *   `DB_URL`: Paste the **NEW** Firebase URL you copied above.
-    *   `DB_SECRET`: Paste the **NEW** Secret you copied above.
-5.  **Upload Code**:
+3.  **Configure Secrets**:
+    *   Copy `Arduino/src/Main/secrets_template.h` to `Arduino/src/Main/secrets.h`.
+    *   Open `secrets.h`.
+    *   Update `WIFI_SSID`, `WIFI_PASSWORD`, `DB_URL`, and `DB_SECRET` with the new values.
+4.  **Upload Code**:
     *   Connect your new ESP8266 via USB.
     *   Select the correct Board (NodeMCU 1.0) and Port.
     *   Click **Upload** (Right Arrow).
