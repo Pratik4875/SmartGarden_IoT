@@ -92,6 +92,7 @@ void takeReading() {
 
     // Auto Logic
     if (soil1 < 270) {
+      // NOTE: Buck Converter / Standard Relay logic (HIGH = ON)
       digitalWrite(PUMP_PIN, HIGH);
       pumpStatus = true;
       Serial.println("Action: PUMP ON (Low Water)");
@@ -135,10 +136,10 @@ void takeReading() {
 void setup() {
   pinMode(SOIL_PIN, INPUT);
   pinMode(PUMP_PIN, OUTPUT);
-  digitalWrite(PUMP_PIN, LOW);
+  digitalWrite(PUMP_PIN, LOW); // Start OFF (Low)
   
   Serial.begin(115200);
-  Serial.println("Booting");
+  Serial.println("Booting (BUCK CONVERTER VERSION)");
 
   setupWifi();
   timeClient.begin();
@@ -180,6 +181,7 @@ void checkManualPump() {
 
     // If not already ON, mark start time
     if (!pumpStatus) {
+       // BUCK: HIGH = ON
        digitalWrite(PUMP_PIN, HIGH);
        pumpStatus = true;
        manualPumpStartTime = currentMillis;
@@ -189,6 +191,7 @@ void checkManualPump() {
     else {
        if (currentMillis - manualPumpStartTime > MAX_PUMP_RUNTIME) {
           Serial.println("Auto-Lock: Max runtime exceeded. Turning OFF.");
+          // BUCK: LOW = OFF
           digitalWrite(PUMP_PIN, LOW);
           pumpStatus = false;
           lastPumpOffTime = currentMillis;
@@ -199,6 +202,7 @@ void checkManualPump() {
   // Case 2: App requests OFF
   else if (payload == "false") {
     if (pumpStatus) {
+       // BUCK: LOW = OFF
        digitalWrite(PUMP_PIN, LOW);
        pumpStatus = false;
        lastPumpOffTime = currentMillis; // Start cooldown
@@ -212,12 +216,6 @@ void checkManualPump() {
 
 // NEW: Track last watered minute to prevent double-watering
 int lastTriggeredMinute = -1;
-
-// ... (Objects)
-
-// ... (Helpers)
-
-// ... (Setup)
 
 void checkSchedule() {
   // Force update to ensure fresh time
@@ -257,12 +255,14 @@ void checkSchedule() {
      }
   
      Serial.printf("MATCH! Watering for %d sec\n", duration);
+     // BUCK: HIGH = ON
      digitalWrite(PUMP_PIN, HIGH);
      
      // Update flag BEFORE delay so we don't retry if delay is short
      lastTriggeredMinute = currentM;
      
      delay(duration * 1000); 
+     // BUCK: LOW = OFF
      digitalWrite(PUMP_PIN, LOW);
      
      dbWrite("/status/last_watered", String(timeClient.getEpochTime()));
@@ -277,9 +277,6 @@ void loop() {
   unsigned long currentMillis = millis();
 
   // 0. Manual Pump Check (Every 1s for responsiveness)
-  // We can reuse a timer or just do it frequently. 
-  // dbRead takes time (HTTP request), so we shouldn't do it TOO fast.
-  // 1-2 seconds is good.
   static unsigned long previousManualMillis = 0;
   if (currentMillis - previousManualMillis >= 1000) {
     previousManualMillis = currentMillis;
