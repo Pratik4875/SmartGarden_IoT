@@ -1,64 +1,83 @@
-# Smart Garden IoT 🌿
+# 🌱 Smart Garden IoT
+
+**"The Intelligent Upgrade"**
 
 A complete IoT solution for automated plant watering and monitoring using ESP8266 and Flutter.
+This project integrates real-time soil moisture tracking, smart pump control, and historical analytics into a beautiful, cross-platform mobile app.
 
-## Features
-- **Remote Monitoring**: View Soil Moisture, Temperature (optional), and Pump Status in real-time via the App.
-- **Smart Control**: Manually toggle the pump or let the automation handle it based on soil moisture levels.
-- **History & Analysis**: View historical data graphs and daily insights (Min/Max Moisture).
-- **Auto-Lock**: Safety feature to automatically turn off the pump after 15 seconds to prevent overflow.
-- **Cooldown**: Prevents rapid toggling of the pump.
-- **Scheduler**: Set specific times for watering.
+---
 
-## Getting Started
+## 📸 Visual Tour
+*Experience the fresh look of EcoSync v2.0:*
+
+| Dashboard & Controls | Settings & Profile |
+|:---:|:---:|
+| ![Dashboard](https://github.com/user-attachments/assets/4cd5c94e-be17-4e36-bbea-bb209bb83271) | ![Profile](https://github.com/user-attachments/assets/e4544493-d7b2-4942-afae-7f00af1567a1) |
+| ![Control](https://github.com/user-attachments/assets/bf2ef2a3-1786-4ede-929a-382f52f5c8f5) | ![Settings](https://github.com/user-attachments/assets/906d000d-d277-46bd-97f6-aa55758e7f48) |
+
+### 📊 History & Analytics
+![Analytics](https://github.com/user-attachments/assets/54ac5eda-487f-4744-a632-7c454f2f2d55)
+![Graphs](https://github.com/user-attachments/assets/0ad1d3a5-4da6-451c-ba3b-dc87c7875f10)
+
+### 🌿 Smart Setup & Login
+| | |
+|:---:|:---:|
+| ![Login](https://github.com/user-attachments/assets/e1d142dd-8b86-4466-b930-c90366545e9f) | ![Setup](https://github.com/user-attachments/assets/06c07c66-a918-4bf3-b55c-5858a5d782d7) |
+| ![Welcome](https://github.com/user-attachments/assets/19756746-a66b-4124-bf31-fc354681847e) | ![Connect](https://github.com/user-attachments/assets/a8db412a-1aaf-4933-8b7f-7ddf9704f11c) |
+
+### 🎨 Themes & Design Details
+![Design 1](https://github.com/user-attachments/assets/5aafc27a-fa51-4443-8334-bbd69b04f3c4)
+![Design 3](https://github.com/user-attachments/assets/499714d6-50df-4210-bfe6-88a3ed44885c)
+
+---
+
+## 🚀 Key Features
+
+### 📱 Mobile App (EcoSync)
+- **Hybrid UI**: A stunning new interface with glassmorphism, animated status indicators, and responsive design.
+- **Real-Time Monitoring**: Live updates for Soil Moisture and Pump Status (every 5 seconds).
+- **History & Insights**: Detailed graphs and daily min/max moisture analysis.
+- **Smart Updates**: In-app OTA updates directly from GitHub Releases.
+- **Multi-System Support**: Easily switch between different gardens by changing the Database URL.
+
+### 🧠 Firmware (ESP8266)
+- **Buck Converter Ready**: Native support for Buck Converter setups (High Trigger = ON).
+- **Intelligent Logging**: Live status updates constantly, but history is logged only once per hour to save database space.
+- **Auto-Lock Safety**: Automatically turns off the pump after **15 seconds** to prevent flooding.
+- **Cool-down Protection**: Prevents the pump from being toggled too frequently (5-second safety delay).
+- **OTA Capability**: Update firmware over-the-air without plugging in USB.
+
+---
+
+## 🛠️ Getting Started
 
 ### Prerequisites
-1.  **Hardware**: ESP8266 (NodeMCU or D1 Mini), Soil Moisture Sensor (Analog), Relay Module, Water Pump.
-2.  **Software**: Arduino IDE, Flutter SDK.
-3.  **Cloud**: Firebase Account (Realtime Database).
-
----
+1.  **Hardware**: ESP8266 (NodeMCU/D1 Mini), Soil Moisture Sensor, Relay Module, Water Pump.
+2.  **Software**: Arduino IDE, Flutter SDK (optional, only if building app).
+3.  **Cloud**: Firebase Realtime Database (Free Tier).
 
 ### Step 1: Firebase Setup
-1.  Go to [Firebase Console](https://console.firebase.google.com/).
-2.  Create a new project.
-3.  Navigate to **Realtime Database** and create a database (Start in **Test Mode** or configure rules to `true` for read/write for testing).
-4.  Copy your **Database URL** (e.g., `https://your-project.firebaseio.com/`).
-5.  Go to **Project Settings** -> **Service Accounts** -> **Database Secrets** and copy the **Secret**.
+1.  Create a **Firebase Project** and add a **Realtime Database**.
+2.  Set Rules to **Test Mode** (`read: true, write: true`).
+3.  Copy your **Database URL** and **Database Secret**.
 
-### Step 2: Hardware Setup (ESP8266)
-1.  Open `Arduino/src/Main/Main.ino` in Arduino IDE.
-2.  Install required libraries: `FirebaseESP8266`, `ArduinoJson`, `NTPClient`.
-3.  **Configuration**:
-    -   Rename `secrets_template.h` to `secrets.h`.
-    -   Fill in your WiFi credentials, Firebase URL, and Secret.
-    ```cpp
-    #define WIFI_SSID "YourWiFiName"
-    #define WIFI_PASSWORD "YourWiFiPass"
-    #define DB_URL "https://your-project.firebaseio.com"
-    #define DB_SECRET "YourFirebaseSecret"
-    ```
-4.  Upload the code to your ESP8266.
+### Step 2: Flash Firmware
+1.  Open `Arduino/src/Main/Main.ino`.
+2.  Install libraries: `ArduinoJson` (v6), `NTPClient`.
+3.  Rename `secrets_template.h` to `secrets.h` and enter your WiFi/Firebase details.
+4.  Upload to ESP8266.
 
-### Step 3: App Setup (Flutter)
-1.  Navigate to the `app` directory.
-2.  Run `flutter pub get` to install dependencies.
-3.  **Connect**:
-    -   Open the App.
-    -   Enter your **Firebase Database URL** when prompted (or in Settings).
-    -   The app will automatically connect to your garden!
+### Step 3: Install App
+1.  Download the latest `EcoSync.apk` from [Releases](/releases).
+2.  Open the app and paste your **Firebase Database URL**.
+3.  Connected! 🌿
 
 ---
 
-## Directory Structure
--   `Arduino/`: Code for the ESP8266 microcontroller.
--   `app/`: Flutter mobile application source code.
--   `docs/`: Documentation and screenshots.
+## 📂 Directory Structure
+-   `Arduino/`: ESP8266 Firmware (Main.ino supports Buck Converter logic).
+-   `app/`: complete Flutter source code.
+-   `docs/`: Guides for setup, releasing, and screenshots.
 
-## Photos
-*(This is where you can upload photos of your setup)*
-<!-- Add your photos in the docs/photos folder and link them here -->
-<!-- ![My Setup](docs/photos/setup.jpg) -->
-
-## License
-MIT
+## 📄 License
+MIT License
